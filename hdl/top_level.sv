@@ -1,38 +1,63 @@
 `timescale 1ns / 1ps
 `default_nettype none
 
-module top_level
-    (
-        input wire          clk_100mhz,
-        
-        output logic [15:0] led,
-        input wire [15:0]   sw,
-        input wire [3:0]    btn,
-        output logic [2:0]  rgb0,
-        output logic [2:0]  rgb1,
+module top_level (
+    input wire clk_100mhz,
+    
+    output logic [15:0] led,
+    input wire [3:0] btn,
+    output logic [2:0] rgb0,
+    output logic [2:0] rgb1,
+    
+    // Ethernet RMII interface
+    input wire eth_crsdv,
+    input wire [1:0] eth_rxd,
+    output logic eth_txen,
+    output logic [1:0] eth_txd
+);
 
-        // seven segment
-        output logic [3:0]  ss0_an,//anode control for upper four digits of seven-seg display
-        output logic [3:0]  ss1_an,//anode control for lower four digits of seven-seg display
-        output logic [6:0]  ss0_c, //cathode controls for the segments of upper four digits
-        output logic [6:0]  ss1_c, //cathod controls for the segments of lower four digits
-
-        // ethernet RMII interface
-        input logic eth_crsdv,
-        input logic[1:0] eth_rxd,
-
-        output logic eth_txen,
-        output logic[1:0] eth_txd,
-
-        // // hdmi port
-        // output logic [2:0]  hdmi_tx_p, //hdmi output signals (positives) (blue, green, red)
-        // output logic [2:0]  hdmi_tx_n, //hdmi output signals (negatives) (blue, green, red)
-        // output logic        hdmi_clk_p, hdmi_clk_n //differential hdmi clock
-
+    logic sys_rst;
+    logic clk_50mhz;
+    logic eth_locked;
+    
+    assign sys_rst = btn[0];
+    
+    // Generate 50MHz clock
+    cw_eth_50mhz eth_clock_gen (
+        .clk_100mhz(clk_100mhz),
+        .clk_50mhz(clk_50mhz),
+        .reset(sys_rst),
+        .locked(eth_locked)
     );
-
-endmodule // top_level
-
+    
+    // Send 50MHz to PHY
+    // assign eth_refclk = clk_50mhz;
+    
+    // TX signals idle
+    assign eth_txen = 1'b0;
+    assign eth_txd = 2'b00;
+    
+    // Packet counter
+    logic crsdv_prev;
+    logic [15:0] packet_count;
+    
+    always_ff @(posedge clk_50mhz) begin
+        if (sys_rst) begin
+            packet_count <= 0;
+            crsdv_prev <= 0;
+        end else begin
+            crsdv_prev <= eth_crsdv;
+            if (eth_crsdv && !crsdv_prev) begin
+                packet_count <= packet_count + 1;
+            end
+        end 
+    end
+    
+    assign led[0] = eth_locked;
+    assign led[1] = eth_crsdv;
+    assign led[2] = |eth_rxd;
+    assign led[15:3] = packet_count[12:0];
+    
+endmodule
 
 `default_nettype wire
-
