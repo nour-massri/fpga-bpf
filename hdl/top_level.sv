@@ -11,9 +11,16 @@ module top_level (
     
     // Ethernet RMII interface
     input wire eth_crsdv,
+    input wire eth2_crsdv,
+
     input wire [1:0] eth_rxd,
+    input wire [1:0] eth2_rxd,
+
     output logic eth_txen,
-    output logic [1:0] eth_txd
+    output logic eth2_txen,
+
+    output logic [1:0] eth_txd,
+    output logic [1:0] eth2_txd
 );
 
     logic sys_rst;
@@ -36,27 +43,44 @@ module top_level (
     // TX signals idle
     assign eth_txen = 1'b0;
     assign eth_txd = 2'b00;
+
+    // Idle tx signals for ethernet 2
+    assign eth2_txen = 1'b0;
+    assign eth2_txd = 2'b00;
     
     // Packet counter
-    logic crsdv_prev;
-    logic [15:0] packet_count;
+    logic eth1_crsdv_prev;
+    logic eth2_crsdv_prev;
+
+    logic [6:0] eth1_packet_count;
+    logic [6:0] eth2_packet_count;
     
     always_ff @(posedge clk_50mhz) begin
         if (sys_rst) begin
-            packet_count <= 0;
-            crsdv_prev <= 0;
+            eth1_packet_count <= 0;
+            eth2_packet_count <= 0;
+
+            eth1_crsdv_prev <= 0;
+            eth2_crsdv_prev <= 0;
         end else begin
-            crsdv_prev <= eth_crsdv;
-            if (eth_crsdv && !crsdv_prev) begin
-                packet_count <= packet_count + 1;
+
+            eth1_crsdv_prev <= eth_crsdv;
+            eth2_crsdv_prev <= eth2_crsdv;
+
+            // Update packet counts
+            if (eth_crsdv && !eth1_crsdv_prev) begin
+                eth1_packet_count <= eth1_packet_count + 1;
+            end
+
+            if (eth2_crsdv && !eth2_crsdv_prev) begin
+                eth2_packet_count <= eth2_packet_count + 1;
             end
         end 
     end
     
     assign led[0] = eth_locked;
-    assign led[1] = eth_crsdv;
-    assign led[2] = |eth_rxd;
-    assign led[15:3] = packet_count[12:0];
+    assign led[7:1] = eth2_packet_count[6:0];
+    assign led[15:8] = eth1_packet_count[6:0];
     
 endmodule
 
