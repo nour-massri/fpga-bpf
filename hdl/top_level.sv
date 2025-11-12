@@ -40,13 +40,13 @@ module top_level (
     // Send 50MHz to PHY
     // assign eth_refclk = clk_50mhz;
     
-    // TX signals idle
-    assign eth_txen = 1'b0;
-    assign eth_txd = 2'b00;
+    // // TX signals idle
+    // assign eth_txen = 1'b0;
+    // assign eth_txd = 2'b00;
 
-    // Idle tx signals for ethernet 2
-    assign eth2_txen = 1'b0;
-    assign eth2_txd = 2'b00;
+    // // Idle tx signals for ethernet 2
+    // assign eth2_txen = 1'b0;
+    // assign eth2_txd = 2'b00;
     
     // Packet counter
     logic eth1_crsdv_prev;
@@ -80,8 +80,14 @@ module top_level (
     
     assign led[0] = eth_locked;
     assign led[7:1] = eth2_packet_count[6:0];
-    assign led[15:8] = eth1_packet_count[6:0];
+    assign led[14:8] = eth1_packet_count[6:0];
     
+
+    assign eth_txen = eth2_crsdv;
+    assign eth2_txen = eth_crsdv;
+    assign eth_txd = eth2_rxd; 
+    assign eth2_txd = eth_rxd; 
+
 endmodule
 
 `default_nettype wire
