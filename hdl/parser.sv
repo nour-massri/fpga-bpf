@@ -1,5 +1,4 @@
-`timescale 1ns / 1ps
-`default_nettype none
+`timescale 1ns / 1ps `default_nettype none
 
 module parser (
     input wire clk,
@@ -9,13 +8,13 @@ module parser (
     output logic [31:0] src_ip,
     output logic ip_valid
 );
-    always_ff @(posedge clk) begin
-        if(rst) begin
-            ip_valid <= 0;
-        end else begin 
-            ip_valid <= 1;
-        end
+  always_ff @(posedge clk) begin
+    if (rst) begin
+      ip_valid <= 0;
+    end else begin
+      ip_valid <= 1;
     end
+  end
 endmodule
 
 `default_nettype wire

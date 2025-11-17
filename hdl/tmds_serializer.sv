@@ -12,8 +12,8 @@ module tmds_serializer (
 
   // this is requried for OSERDESE2 to work
   logic pwup_rst = 1'b1;
-  always @(posedge clk_pixel)begin
-      pwup_rst <= 1'b0;
+  always @(posedge clk_pixel) begin
+    pwup_rst <= 1'b0;
   end
 
   OSERDESE2 #(

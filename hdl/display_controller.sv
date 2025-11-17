@@ -33,6 +33,7 @@ module display_controller (
   localparam V_SYNC = 5; 
   localparam V_BACK_PORCH = 20;
 
+  localparam FPS = 60;
   // ------------------------------------------------------------------------
   // HDMI internal signals
   // ------------------------------------------------------------------------
