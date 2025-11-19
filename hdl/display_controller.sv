@@ -1,6 +1,13 @@
 `timescale 1ns / 1ps `default_nettype none
 
-module display_controller (
+module display_controller #(
+    parameter UNIT_WIDTH = 16,
+    parameter UNIT_HEIGHT = 16,
+    parameter ORIGIN_X = 40,
+    parameter ORIGIN_Y = 40,
+    parameter WIDTH = 1200,
+    parameter HEIGHT = 640
+    ) (
     input wire clk_pixel,
     input wire clk_5x,
     input wire rst_pixel,
@@ -26,7 +33,7 @@ module display_controller (
   localparam H_PIXELS = 1280;
   localparam H_FRONT_PORCH = 110;
   localparam H_SYNC = 40;
-  localparam H_BACK_PORCH = 220
+  localparam H_BACK_PORCH = 220;
 
   localparam V_LINES = 720;
   localparam V_FRONT_PORCH = 5;
@@ -39,7 +46,7 @@ module display_controller (
   // ------------------------------------------------------------------------
 
   logic [$clog2(H_PIXELS+H_FP+H_SYNC+H_BP)-1:0] h_count;
-  logic [ $clog2(V_LINES+V_FP+V_SYNC+V_BP)-1:0] v_count;
+  logic [$clog2(V_LINES+V_FP+V_SYNC+V_BP)-1:0] v_count;
   logic v_sync, h_sync, active_draw, new_frame;
   logic [7:0] red, green, blue;
   logic [9:0] tmds_10b   [0:2];  //output of each TMDS encoder!
@@ -69,11 +76,93 @@ module display_controller (
   // ------------------------------------------------------------------------
   // TODO: fill out logic to new values to display on each new frame
 
+    localparam NUM_TIME_RANGES = WIDTH/UNIT_WIDTH;
+    localparam NUM_PACKET_RANGES = HEIGHT/UNIT_HEIGHT;
+
+    logic [NUM_TIME_RANGES-1:0][31:0] packet_counts;
+    logic [NUM_TIME_RANGES-1:0][31:0] dropped_packet_counts;
+
+    logic packet_count_index;
+
+    always_ff @(posedge clk_pixel) begin
+        // When new frame signal is high we want to update the packet counts
+        // and our counter
+        if (rst) begin
+            packet_counts <= 0;
+            packet_count_index <= 0;
+        end else begin
+            if (new_frame) begin
+                if (packet_count_index == NUM_RANGES-1) begin 
+                    packet_counts <= packet_counts << 31;
+                    dropped_packet_counts <= dropped_packet_counts << 31;
+                end else begin
+                    packet_count_index <= packet_count_index + 1;
+                end
+                packet_counts[packet_count_index] <= i_total_packets;
+                dropped_packet_counts[packet_count_index] <= i_dropped_packets;
+            end
+        end
+       
+    end 
+
+   
+
   // ------------------------------------------------------------------------
   // Drawing Logic
   // ------------------------------------------------------------------------
   // TODO: fill out drawing logic  for the spcific h_count, v_count pixels using 
   // statistics and display_fifo packet info and filtering result
+
+    // We check if the v_count is in between some range
+    // If it is, we check what row and column it is in, wiithin that range
+    // We get the associated packet count with a specific column, 
+    // and we only color it black if the packet count is supposed to be in that row (we will have
+    // ranges for each row))
+
+    // TODO: Need to update the sizes of these variables
+    logic [31:0] new_x_count;
+    logic [31:0] new_y_count;
+    logic [$clog2(NUM_TIME_RANGES-1):0] time_bucket;
+    logic [$clog2(NUM_PACKET_RANGES-1):0] packet_count_bucket;
+
+    logic [31:0] current_packet_count;
+    logic [31:0] current_dropped_packet_count;
+
+    always_comb begin
+        in_graph_frame =(h_count >= ORIGIN_X) && (h_count < ORIGIN_X + WIDTH) && (v_count >= ORIGIN_Y) && (v_count >= ORIGIN_X + HEIGHT);
+        if (in_graph_frame) begin
+            new_x_count = x_count - ORIGIN_X;
+            new_y_count = y_count - ORIGIN_Y;
+
+            // Since we are currently dealing with unit squares of width 16, then we will cut off the last 4 bits
+            time_bucket = new_x_count[31:5];
+            packet_count_bucket = new_y_count[31:5];
+            current_packet_count = packet_counts[time_bucket];
+            current_dropped_packet_count = dropped_packet_counts[time_bucket];
+
+            // Need to figure out how to reduce latency for multiplications (especially because of the two else if checks)
+            if (new_x_count == 0 || new_y_count == 0 || new_x_count == WIDTH || new_y_count == HEIGHT) begin
+                // Black borders
+                red = 0;
+                blue = 0;
+                green = 0;
+            end else if (packet_count_bucket * 1000 < current_dropped_packet_count && current_dropped_packet_count <= (packet_count_bucket + 1) * (1000)) begin
+                // Color red for dropped packets
+                red = 8'HFF;
+                blue = 0;
+                green = 0;
+            end else if (packet_count_bucket * 1000 < current_packet_count && current_packet_count <= (packet_count_bucket + 1) * (1000)) begin
+                // Color green for packets that passed
+                red = 0;
+                blue = 0;
+                green = 8'HFF;
+            end else begin 
+                red = 8'HFF;
+                blue = 8'HFF;
+                green = 8'HFF;
+            end
+        end
+    end
 
   // ------------------------------------------------------------------------
   // HDMI Output Path
