@@ -51,6 +51,7 @@ module network_bpf (
     typedef struct packed {
         logic [BUF_ID_BITS-1:0]   id;  // Which buffer to use
         logic [BUF_ADDR_BITS-1:0] len; // Length of the packet
+        logic                     valid; // 1=valid frame, 0=invalid/drop
     } rx_packet_desc_t;
 
     // 2. BPF -> TX
@@ -183,8 +184,7 @@ module network_bpf (
     // Internal FIFO Instantiation
     // ------------------------------------------------------------------------
 
-    // init with 1, 2, ..., NUM_BUFFERS 
-    fifo_init #(
+    fifo #(
         .DATA_WIDTH(BUF_ID_BITS),
         .FIFO_DEPTH(FIFO_DEPTH),
         .INIT_COUNT(NUM_BUFFERS)
@@ -279,6 +279,7 @@ module network_bpf (
         .o_buf_id(bpf_buf_id_out),
         .o_rd_addr(bpf_rd_addr_out),
         .i_rd_data(bpf_rd_data),
+
         .o_pkt_bpf_dropped_pulse(pkt_bpf_dropped_pulse)
     );
 

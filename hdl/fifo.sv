@@ -3,7 +3,8 @@
 
 module fifo #(
     parameter int DATA_WIDTH = 8,
-    parameter int FIFO_DEPTH = 4
+    parameter int FIFO_DEPTH = 4,
+    parameter int INIT_COUNT = 0 
 ) (
     input wire clk,
     input wire rst,
@@ -34,9 +35,12 @@ module fifo #(
 
     always_ff @(posedge clk) begin
         if (rst) begin
+            for (int i = 0; i < INIT_COUNT; i++) begin
+                mem[i] <= i[DATA_WIDTH-1:0];
+            end
             wr_ptr <= 0;
             rd_ptr <= 0;
-            count <= 0;
+            count <= (INIT_COUNT > 0) ? INIT_COUNT : 0;
         end else begin
             case ({do_push, do_pop})
                  2'b11: begin // Push and pop
@@ -60,7 +64,13 @@ module fifo #(
             endcase
         end
     end
-
+    
+    initial begin
+        if (INIT_COUNT > FIFO_DEPTH) begin
+            $error("INIT_COUNT (%0d) cannot exceed FIFO_DEPTH (%0d)", INIT_COUNT, FIFO_DEPTH);
+        end
+    end
+    
 endmodule
 
 `default_nettype wire
