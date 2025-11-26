@@ -38,24 +38,24 @@ module fifo #(
             for (int i = 0; i < INIT_COUNT; i++) begin
                 mem[i] <= i[DATA_WIDTH-1:0];
             end
-            wr_ptr <= 0;
+            wr_ptr <= INIT_COUNT;
             rd_ptr <= 0;
             count <= (INIT_COUNT > 0) ? INIT_COUNT : 0;
         end else begin
             case ({do_push, do_pop})
                  2'b11: begin // Push and pop
                     mem[wr_ptr] <= i_push_data;
-                    wr_ptr <= (wr_ptr + 1) % FIFO_DEPTH;
-                    rd_ptr <= (rd_ptr + 1) % FIFO_DEPTH;
+                    wr_ptr <= (wr_ptr + 1);
+                    rd_ptr <= (rd_ptr + 1);
                     // count stays the same
                 end
                 2'b10: begin // Push
                     mem[wr_ptr] <= i_push_data;
-                    wr_ptr <= (wr_ptr + 1) % FIFO_DEPTH;
+                    wr_ptr <= (wr_ptr + 1);
                     count <= count + 1;
                 end
                 2'b01: begin // Pop
-                    rd_ptr <= (rd_ptr + 1) % FIFO_DEPTH;
+                    rd_ptr <= (rd_ptr + 1);
                     count <= count - 1;
                 end
 
