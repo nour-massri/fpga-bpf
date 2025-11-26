@@ -13,8 +13,10 @@ module video_sig_gen #(
 ) (
     input wire pixel_clk,
     input wire rst,
-    output logic [$clog2(ACTIVE_H_PIXELS + H_FRONT_PORCH + H_SYNC_WIDTH + H_BACK_PORCH)-1:0] h_count,
-    output logic [$clog2(ACTIVE_LINES + V_FRONT_PORCH + V_SYNC_WIDTH + V_BACK_PORCH)-1:0]    v_count,
+    output logic [$clog2(
+ACTIVE_H_PIXELS + H_FRONT_PORCH + H_SYNC_WIDTH + H_BACK_PORCH
+)-1:0] h_count,
+    output logic [$clog2(ACTIVE_LINES + V_FRONT_PORCH + V_SYNC_WIDTH + V_BACK_PORCH)-1:0] v_count,
     output logic v_sync,
     output logic h_sync,
     output logic active_draw,

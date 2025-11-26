@@ -15,9 +15,10 @@ module display_controller (
     input wire [31:0] i_dropped_packets,
 
     // HDMI Ports
-    output logic [2:0]  hdmi_tx_p, 
-    output logic [2:0]  hdmi_tx_n, 
-    output logic        hdmi_clk_p, hdmi_clk_n
+    output logic [2:0] hdmi_tx_p,
+    output logic [2:0] hdmi_tx_n,
+    output logic       hdmi_clk_p,
+    hdmi_clk_n
 );
 
   // ------------------------------------------------------------------------
@@ -30,7 +31,7 @@ module display_controller (
 
   localparam V_LINES = 720;
   localparam V_FRONT_PORCH = 5;
-  localparam V_SYNC = 5; 
+  localparam V_SYNC = 5;
   localparam V_BACK_PORCH = 20;
 
   localparam FPS = 60;
