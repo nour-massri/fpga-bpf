@@ -76,9 +76,9 @@ module top_level (
 //   logic                display_fifo_pop_valid;
 
   // --- Statistics Signals ---
-  logic         [31:0] total_packets_count;  // From Network (eth1_clk)
-  logic         [31:0] dropped_packets_count;  // From Network (eth1_clk)
-  logic         [31:0] total_bytes_count;
+  logic         [31:0] total_bytes;  // From Network (eth1_clk)
+  logic         [31:0] recieved_packets;  // From Network (eth1_clk)
+  logic         [31:0] sent_packets;
 //   logic         [31:0] cdc_total_packets;  // To Display (clk_pixel)
 //   logic         [31:0] cdc_dropped_packets;  // To Display (clk_pixel)
 
@@ -146,9 +146,9 @@ module top_level (
     //   .i_display_fifo_full(display_fifo_full),
 
       // Statistics output
-      .o_total_bytes(total_bytes_count),
-      .o_total_packets  (total_packets_count),
-      .o_dropped_packets(dropped_packets_count)
+      .o_total_bytes(total_bytes),
+      .o_recieved_packets  (recieved_packets),
+      .o_sent_packets(sent_packets)
   );
 
 //   // --- Display Controller ---
@@ -181,13 +181,13 @@ module top_level (
   seven_segment_controller scc (
       .clk(eth1_clk),
       .rst(sys_rst),
-      .val(total_bytes_count),
+      .val({sent_packets[23:16], recieved_packets[23:16] ,sent_packets[7:0], recieved_packets[7:0]}),
       .cat(ss_c),
       .an ({ss0_an, ss1_an})
   );
   assign ss0_c = ss_c;
   assign ss1_c = ss_c;
-  assign led   = {total_packets_count[23:16], total_packets_count[7:0]};
+  assign led   = 16'b0;
   assign rgb0  = 3'b0;
   assign rgb1  = 3'b0;
 endmodule

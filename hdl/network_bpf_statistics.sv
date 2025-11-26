@@ -5,25 +5,29 @@ module network_bpf_statistics (
     input wire clk,
     input wire rst,
 
-    input wire i_pkt_received,
-    input wire i_pkt_ingress_dropped,
-    input wire i_pkt_bpf_dropped,
+    input wire i_byte_active,
+    input wire i_pkt_recieved,
+    input wire i_pkt_sent,
 
-    output logic [31:0] o_total_packets,
-    output logic [31:0] o_dropped_packets
+    output logic [31:0] o_total_bytes,
+    output logic [31:0] o_recieved_packets,
+    output logic [31:0] o_sent_packets
 );
 
     always_ff @(posedge clk) begin
         if (rst) begin
-            o_total_packets <= 32'h0;
-            o_dropped_packets <= 32'h0;
-        end else begin
-            if (i_pkt_received) begin
-                o_total_packets <= o_total_packets + 32'h1;
+            o_total_bytes <= 32'h0;
+            o_recieved_packets <= 32'h0;
+            o_sent_packets <= 32'h0;
+        end else begin            
+            if(i_byte_active) begin 
+                o_total_bytes <= o_total_bytes + 32'h1;
             end
-
-            if (i_pkt_ingress_dropped || i_pkt_bpf_dropped) begin
-                o_dropped_packets <= o_dropped_packets + 32'h1;
+            if (i_pkt_recieved) begin
+                o_recieved_packets <= o_recieved_packets + 32'h1;
+            end
+            if (i_pkt_sent) begin
+                o_sent_packets <= o_sent_packets + 32'h1;
             end
         end
     end
