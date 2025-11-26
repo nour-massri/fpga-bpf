@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps `default_nettype none
-
+`include "packet_defs.svh"
 module display_controller (
     input wire clk_pixel,
     input wire clk_5x,
@@ -17,7 +17,7 @@ module display_controller (
     // HDMI Ports
     output logic [2:0]  hdmi_tx_p, 
     output logic [2:0]  hdmi_tx_n, 
-    output logic        hdmi_clk_p, hdmi_clk_n,
+    output logic        hdmi_clk_p, hdmi_clk_n
 );
 
   // ------------------------------------------------------------------------
@@ -26,7 +26,7 @@ module display_controller (
   localparam H_PIXELS = 1280;
   localparam H_FRONT_PORCH = 110;
   localparam H_SYNC = 40;
-  localparam H_BACK_PORCH = 220
+  localparam H_BACK_PORCH = 220;
 
   localparam V_LINES = 720;
   localparam V_FRONT_PORCH = 5;
@@ -38,8 +38,8 @@ module display_controller (
   // HDMI internal signals
   // ------------------------------------------------------------------------
 
-  logic [$clog2(H_PIXELS+H_FP+H_SYNC+H_BP)-1:0] h_count;
-  logic [ $clog2(V_LINES+V_FP+V_SYNC+V_BP)-1:0] v_count;
+  logic [$clog2(H_PIXELS + H_FRONT_PORCH + H_SYNC + H_BACK_PORCH)-1:0] h_count;
+  logic [$clog2(V_LINES  + V_FRONT_PORCH + V_SYNC + V_BACK_PORCH)-1:0] v_count;
   logic v_sync, h_sync, active_draw, new_frame;
   logic [7:0] red, green, blue;
   logic [9:0] tmds_10b   [0:2];  //output of each TMDS encoder!
@@ -47,13 +47,13 @@ module display_controller (
 
   video_sig_gen #(
       .ACTIVE_H_PIXELS(H_PIXELS),
-      .H_FRONT_PORCH(H_FP),
+      .H_FRONT_PORCH(H_FRONT_PORCH),
       .H_SYNC_WIDTH(H_SYNC),
-      .H_BACK_PORCH(H_BP),
+      .H_BACK_PORCH(H_BACK_PORCH),
       .ACTIVE_LINES(V_LINES),
-      .V_FRONT_PORCH(V_FP),
+      .V_FRONT_PORCH(V_FRONT_PORCH),
       .V_SYNC_WIDTH(V_SYNC),
-      .V_BACK_PORCH(V_BP)
+      .V_BACK_PORCH(V_BACK_PORCH)
   ) vsg (
       .pixel_clk(clk_pixel),
       .rst(rst_pixel),
@@ -104,7 +104,7 @@ module display_controller (
       .clk(clk_pixel),
       .rst(rst_pixel),
       .video_data(blue),
-      .control({v_sync_hdmi, h_sync_hdmi}),
+      .control({v_sync, h_sync}),
       .video_enable(active_draw),
       .tmds(tmds_10b[0])
   );
