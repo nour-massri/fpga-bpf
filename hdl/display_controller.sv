@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_defs.svh"
+// `include "packet_defs.svh"
 module display_controller #(
     parameter UNIT_WIDTH = 16,
     parameter UNIT_HEIGHT = 16,

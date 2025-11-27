@@ -69,7 +69,12 @@ module top_level (
         .reset(sys_rst)
     );
 
-    // --- Packet Counter per second --
+
+
+    // ------------------------------------------------------------------------
+    // Packet Counting and Packet Simulations
+    // ------------------------------------------------------------------------
+    // --- Packet Counter --
 
     // logic display_fifo_push_ready;
     // logic display_fifo_pop_valid;
@@ -153,6 +158,10 @@ module top_level (
     //     end
     // end
 
+    // ------------------------------------------------------------------------
+    // Clock Domain Crossing Communication FIFO & Statistics Instantiation
+    // ------------------------------------------------------------------------
+
     // input wire 		sender_rst,
     // input wire 		sender_clk,
     // input wire 		sender_axis_tvalid,
@@ -174,6 +183,41 @@ module top_level (
     //                                     .sender_axis_tready(display_fifo_push_ready), .sender_axis_tdata(fifo_packet_count), .sender_axis_tlast(0), 
     //                                     .sender_axis_prog_full(fifo_almost_full), .receiver_clk(clk_pixel), .receiver_axis_tvalid(display_fifo_pop_valid), 
     //                                     .receiver_axis_tready(display_fifo_pop_ready), .receiver_axis_tdata(cdc_total_packets), .receiver_axis_prog_empty(fifo_almost_empty) );
+
+
+    // ------------------------------------------------------------------------
+    // Submodule Instantiation
+    // ------------------------------------------------------------------------
+
+    // --- Networking + BPF ---
+    network_bpf network_bpf_submodule (
+        .clk_50mhz(clk_50mhz),
+        .rst(sys_rst),
+
+        // Ingress 
+        .eth1_clk  (eth1_clk),
+        .eth1_crsdv(eth1_crsdv),
+        .eth1_rxd  (eth1_rxd),
+        .eth1_txen (eth1_txen),
+        .eth1_txd  (eth1_txd),
+
+        // Egress
+        // .eth2_clk(eth2_clk),
+        // .eth2_crsdv(eth2_crsdv),  // Pass-through
+        // .eth2_rxd  (eth2_rxd),    // Pass-through
+        // .eth2_txen (eth2_txen),   // Egress
+        // .eth2_txd  (eth2_txd),    // Egress
+
+        //   // Push side of display_fifo
+        //   .o_display_job_push (display_fifo_push_valid),
+        //   .o_display_job_data (display_fifo_push_data),
+        //   .i_display_fifo_full(display_fifo_full),
+
+        // Statistics output
+        .o_total_bytes(total_bytes),
+        .o_recieved_packets(recieved_packets),
+        .o_sent_packets(sent_packets)
+    );
 
     // --- Display Controller ---
     display_controller display_controller_submodule (
