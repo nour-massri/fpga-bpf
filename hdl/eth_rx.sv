@@ -8,7 +8,6 @@ module eth_rx #(
     input wire rst,
 
     // Ethernet RX (RMII)
-    input wire eth_clk,
     input wire eth_crsdv,
     input wire [1:0] eth_rxd,
 
@@ -63,7 +62,7 @@ module eth_rx #(
   rmii_to_byte rmii (
       .clk(clk),
       .rst(rst),
-      .eth_clk(eth_clk),
+
       .eth_crsdv(eth_crsdv),
       .eth_rxd(eth_rxd),
       .o_byte_valid(byte_valid),
@@ -78,7 +77,7 @@ module eth_rx #(
   // FSM Logic
   //=========================================================================
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (rst) begin
       state <= WAIT_FOR_BUF;
     end else begin
@@ -137,13 +136,13 @@ module eth_rx #(
   // Data path
   //=========================================================================
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (o_free_buf_pop) begin
       current_buf_id <= i_free_buf_id;
     end
   end
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (state == IDLE) begin
       byte_cnt <= '0;
     end else if (state == RECEIVE_DATA && byte_valid) begin
@@ -169,7 +168,7 @@ module eth_rx #(
   assign o_bpf_work_desc.valid = pkt_is_valid; // TODO: CRC check result
 
   // Statistics
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     o_pkt_received_pulse <= o_free_buf_pop;
     o_byte_active <= byte_valid;
     // TODO: Implement proper drop logic

@@ -2,11 +2,10 @@
 `include "packet_defs.svh"
 
 module network_bpf (
-    input wire clk_50mhz,
+    input wire clk,
     input wire rst,
 
     // Port 1 (Ingress)
-    input wire eth1_clk,
     input wire eth1_crsdv,
     input wire [1:0] eth1_rxd,
     output logic eth1_txen,
@@ -114,28 +113,11 @@ module network_bpf (
   // BRAM Instantiation
   // ------------------------------------------------------------------------
 
-  // //  Xilinx Single Port Read First RAM (Program ROM)
-  // xilinx_single_port_ram_read_first #(
-  //     .RAM_WIDTH(32),                       
-  //     .RAM_DEPTH(32),
-  //     .RAM_PERFORMANCE("HIGH_PERFORMANCE"),
-  //     .INIT_FILE(`FPATH(bpf_program.mem))
-  // ) image_mem(
-  //     .addra(image_addr),
-  //     .dina(8'b0),
-  //     .clka(eth1_clk),
-  //     .wea(1'b0),
-  //     .ena(1'b1),
-  //     .rsta(rst),
-  //     .regcea(1'b1),
-  //     .douta(color_index)
-  // );
-
   xilinx_true_dual_port_read_first_1_clock_ram #(
       .RAM_WIDTH(BRAM_WIDTH),
       .RAM_DEPTH(BRAM_DEPTH)
   ) bpf_packet_bram (
-      .clka(eth1_clk),
+      .clka(clk),
       .addra(rx_wr_addr),
       .dina(rx_wr_data),
       .wea(rx_wren),
@@ -156,7 +138,7 @@ module network_bpf (
       .RAM_WIDTH(BRAM_WIDTH),
       .RAM_DEPTH(BRAM_DEPTH)
   ) tx_packet_bram (
-      .clka(eth1_clk),
+      .clka(clk),
       .addra(rx_wr_addr),
       .dina(rx_wr_data),
       .wea(rx_wren),
@@ -182,7 +164,7 @@ module network_bpf (
       .FIFO_DEPTH(FIFO_DEPTH),
       .INIT_COUNT(NUM_BUFFERS)
   ) free_buf_fifo (
-      .clk(eth1_clk),
+      .clk(clk),
       .rst(rst),
       .i_push_data(free_buf_push_data),
       .i_push_valid(free_buf_push_valid),
@@ -196,7 +178,7 @@ module network_bpf (
       .DATA_WIDTH($bits(packet_desc_t)),
       .FIFO_DEPTH(FIFO_DEPTH)
   ) bpf_work_fifo (
-      .clk(eth1_clk),
+      .clk(clk),
       .rst(rst),
       .i_push_data(bpf_work_push_data),
       .i_push_valid(bpf_work_push_valid),
@@ -210,7 +192,7 @@ module network_bpf (
       .DATA_WIDTH($bits(packet_desc_t)),
       .FIFO_DEPTH(FIFO_DEPTH)
   ) tx_work_fifo (
-      .clk(eth1_clk),
+      .clk(clk),
       .rst(rst),
       .i_push_data(tx_work_push_data),
       .i_push_valid(tx_work_push_valid),
@@ -227,10 +209,9 @@ module network_bpf (
       .BUF_ID_BITS  (BUF_ID_BITS),
       .BUF_ADDR_BITS(BUF_ADDR_BITS)
   ) eth_rx (
-      .clk(eth1_clk),
+      .clk(clk),
       .rst(rst),
 
-      .eth_clk  (eth1_clk),
       .eth_crsdv(eth1_crsdv),
       .eth_rxd  (eth1_rxd),
 
@@ -238,9 +219,9 @@ module network_bpf (
       .i_free_buf_valid(free_buf_pop_valid),
       .o_free_buf_pop(free_buf_pop_ready),
 
-      .o_bpf_work_desc(tx_work_push_data),
-      .o_bpf_work_push(tx_work_push_valid),
-      .i_bpf_work_full(tx_work_full),
+      .o_bpf_work_desc(bpf_work_push_data),
+      .o_bpf_work_push(bpf_work_push_valid),
+      .i_bpf_work_full(bpf_work_full),
 
       .o_wren(rx_wren),
       .o_buf_id(rx_buf_id_out),
@@ -252,40 +233,40 @@ module network_bpf (
       .o_pkt_sent_pulse(pkt_ingress_sent_pulse)
   );
 
-  // bpf_processor #(
-  //     .BUF_ID_BITS(BUF_ID_BITS),
-  //     .BUF_ADDR_BITS(BUF_ADDR_BITS)
-  // ) bpf_processor (
-  //     .clk(eth1_clk),
-  //     .rst(rst),
-  //     .i_bpf_work_desc(bpf_work_pop_data),
-  //     .i_bpf_work_valid(bpf_work_pop_valid),
-  //     .o_bpf_work_pop(bpf_work_pop_ready),
+  bpf_processor #(
+      .BUF_ID_BITS  (BUF_ID_BITS),
+      .BUF_ADDR_BITS(BUF_ADDR_BITS)
+  ) bpf_processor (
+      .clk(clk),
+      .rst(rst),
 
-  //     .o_tx_work_desc(tx_work_push_data),
-  //     .o_tx_work_push(tx_work_push_valid),
-  //     .i_tx_work_full(tx_work_full),
+      .i_bpf_work_desc (bpf_work_pop_data),
+      .i_bpf_work_valid(bpf_work_pop_valid),
+      .o_bpf_work_pop  (bpf_work_pop_ready),
 
-  //     // .o_display_job_push(o_display_job_push),
-  //     // .o_display_job_data(o_display_job_data),
-  //     // .i_display_fifo_full(i_display_fifo_full),
+      .o_tx_work_desc(tx_work_push_data),
+      .o_tx_work_push(tx_work_push_valid),
+      .i_tx_work_full(tx_work_full),
 
-  //     .o_rd_en(bpf_rd_en),
-  //     .o_buf_id(bpf_buf_id_out),
-  //     .o_rd_addr(bpf_rd_addr_out),
-  //     .i_rd_data(bpf_rd_data),
+      // .o_display_job_push(o_display_job_push),
+      // .o_display_job_data(o_display_job_data),
+      // .i_display_fifo_full(i_display_fifo_full),
 
-  //     .o_pkt_bpf_dropped_pulse(pkt_bpf_dropped_pulse)
-  // );
+      .o_rd_en  (bpf_rd_en),
+      .o_buf_id (bpf_buf_id_out),
+      .o_rd_addr(bpf_rd_addr_out),
+      .i_rd_data(bpf_rd_data),
+
+      .o_pkt_bpf_dropped_pulse(pkt_bpf_dropped_pulse)
+  );
 
   eth_tx #(
       .BUF_ID_BITS  (BUF_ID_BITS),
       .BUF_ADDR_BITS(BUF_ADDR_BITS)
   ) eth_tx (
-      .clk(eth1_clk),
+      .clk(clk),
       .rst(rst),
 
-      .eth_clk (eth1_clk),
       .eth_txen(eth1_txen),
       .eth_txd (eth1_txd),
 
@@ -311,7 +292,7 @@ module network_bpf (
   logic [31:0] egress_total_bytes, egress_received_packets, egress_sent_packets;
 
   network_bpf_statistics inress_stats (
-      .clk(eth1_clk),
+      .clk(clk),
       .rst(rst),
       .i_byte_active(pkt_ingress_byte_active),
       .i_pkt_recieved(pkt_ingress_received_pulse),
@@ -323,7 +304,7 @@ module network_bpf (
   );
 
   network_bpf_statistics egress_stats (
-      .clk(eth1_clk),
+      .clk(clk),
       .rst(rst),
       .i_byte_active(pkt_egress_byte_active),
       .i_pkt_recieved(pkt_egress_received_pulse),
@@ -342,7 +323,7 @@ module network_bpf (
 
   //     logic prev_crsdv;
   //     logic sending;
-  //     always_ff @(posedge eth1_clk) begin
+  //     always_ff @(posedge clk) begin
   //     if (!eth1_crsdv) begin
   //         eth1_txen <= 0;
   //         eth1_txd  <= 0;

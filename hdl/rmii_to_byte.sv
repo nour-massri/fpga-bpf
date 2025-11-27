@@ -4,7 +4,6 @@ module rmii_to_byte (
     input wire clk,
     input wire rst,
 
-    input wire eth_clk,
     input wire eth_crsdv,
     input wire [1:0] eth_rxd,
 
@@ -18,7 +17,7 @@ module rmii_to_byte (
   logic [1:0] dibit_count;
   logic receiving;
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (rst) begin
       dibit_count <= 2'd0;
       receiving <= 1'b0;

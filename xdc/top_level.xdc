@@ -128,14 +128,14 @@ set_property -dict {PACKAGE_PIN G16 IOSTANDARD LVCMOS33} [get_ports "eth1_txd[1]
  
  
 #HDMI Signals
-# set_property -dict { PACKAGE_PIN V17   IOSTANDARD TMDS_33  } [get_ports {hdmi_clk_n}]
-# set_property -dict { PACKAGE_PIN U16   IOSTANDARD TMDS_33  } [get_ports {hdmi_clk_p}]
-# set_property -dict { PACKAGE_PIN U18   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_n[0]}]
-# set_property -dict { PACKAGE_PIN R17   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_n[1]}]
-# set_property -dict { PACKAGE_PIN T14   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_n[2]}]
-# set_property -dict { PACKAGE_PIN U17   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_p[0]}]
-# set_property -dict { PACKAGE_PIN R16   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_p[1]}]
-# set_property -dict { PACKAGE_PIN R14   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_p[2]}]
+set_property -dict { PACKAGE_PIN V17   IOSTANDARD TMDS_33  } [get_ports {hdmi_clk_n}]
+set_property -dict { PACKAGE_PIN U16   IOSTANDARD TMDS_33  } [get_ports {hdmi_clk_p}]
+set_property -dict { PACKAGE_PIN U18   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_n[0]}]
+set_property -dict { PACKAGE_PIN R17   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_n[1]}]
+set_property -dict { PACKAGE_PIN T14   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_n[2]}]
+set_property -dict { PACKAGE_PIN U17   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_p[0]}]
+set_property -dict { PACKAGE_PIN R16   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_p[1]}]
+set_property -dict { PACKAGE_PIN R14   IOSTANDARD TMDS_33  } [get_ports {hdmi_tx_p[2]}]
 
 # PWM audio out signals
 #change G15 to B13 and E13 to B14

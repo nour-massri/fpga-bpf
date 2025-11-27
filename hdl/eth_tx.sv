@@ -9,7 +9,6 @@ module eth_tx #(
     input wire rst,
 
     // Ethernet TX (RMII)
-    input wire eth_clk,
     output logic eth_txen,
     output logic [1:0] eth_txd,
 
@@ -65,7 +64,7 @@ module eth_tx #(
   // FSM Logic
   //=========================================================================
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (rst) begin
       state <= IDLE;
     end else begin
@@ -118,7 +117,7 @@ module eth_tx #(
   // Data Path
   //=========================================================================
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (rst || state != SEND_FRAME) begin
       tick_cnt <= 0;
     end else begin
@@ -126,12 +125,12 @@ module eth_tx #(
     end
   end
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (state == IFG_WAIT) ifg_counter <= ifg_counter + 1;
     else ifg_counter <= 0;
   end
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (state == IDLE) begin
       byte_cnt <= 0;
       if (i_tx_work_valid) begin
@@ -146,7 +145,7 @@ module eth_tx #(
     end
   end
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     if (state == PREFETCH) begin
       shift_reg <= i_rd_data;  // Load Byte 0
     end else if (state == SEND_FRAME) begin
@@ -180,7 +179,7 @@ module eth_tx #(
   // Statistics
   // ------------------------------------------------------------------------
 
-  always_ff @(posedge eth_clk) begin
+  always_ff @(posedge clk) begin
     o_pkt_received_pulse <= o_tx_work_pop;
     o_byte_active <= (state == SEND_FRAME) && (tick_cnt == 3);
     o_pkt_sent_pulse <= (state == PREFETCH);
