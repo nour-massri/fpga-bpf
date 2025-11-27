@@ -51,17 +51,6 @@ module top_level (
   logic clk_pixel;
   logic pixel_locked;
 
-  // wire clk_100mhz_ibuf;
-  // IBUF ibuf_clk100 (.I(clk_100mhz), .O(clk_100mhz_ibuf));
-  // wire clk_100mhz_buffered;
-  // BUFG bufg_clk100 (.I(clk_100mhz_ibuf), .O(clk_100mhz_buffered));
-
-  // cw_eth_50mhz eth_clk_wizard (
-  //     .clk_100mhz(clk_100mhz_buffered),
-  //     .clk_50mhz(clk_50mhz),
-  //     .reset(sys_rst),
-  //     .locked(eth_locked)
-  // );
 
   cw_hdmi_clk_wiz hdmi_clk_wizard (
       .sysclk(clk_100mhz),
@@ -78,43 +67,21 @@ module top_level (
   // ------------------------------------------------------------------------
   // --- Packet Counter --
 
-  // logic display_fifo_push_ready;
-  // logic display_fifo_pop_valid;
+  logic display_fifo_pop_valid;
   logic display_fifo_pop_ready;
-  // logic fifo_almost_full;
-  // logic fifo_almost_empty;
-  // logic network_statistics_valid;
-  // logic [31:0] fifo_packet_count;
+  logic network_statistics_valid;
 
-  localparam SAMPLING_CYCLES = 40_000;
+  localparam PACKET_COUNT = 40_000;
   localparam PUSH_CYCLES = 10_000_000;
-  // logic [31:0] packet_count;
-  // logic prev_crsdv;
-  // logic [31:0] cycle_count;
-  // logic [1:0] sys_rst_network_buf;
-
-  // --- Display Controller Work FIFO
-  //   logic                display_fifo_push_valid;
-  //   display_job_t        display_fifo_push_data;
-  //   logic                display_fifo_full;
-  //   logic                display_fifo_pop_ready;
-  //   display_job_t        display_fifo_pop_data;
-  //   logic                display_fifo_pop_valid;
 
   // --- Statistics Signals ---
-  logic [31:0] total_bytes;  // From Network (eth1_clk)
-  logic [31:0] recieved_packets;  // From Network (eth1_clk)
-  logic [31:0] sent_packets;
-  //   logic         [31:0] cdc_total_packets;  // To Display (clk_pixel)
-  //   logic         [31:0] cdc_dropped_packets;  // To Display (clk_pixel)
   logic [31:0] cdc_dropped_packets;
   logic [31:0] cdc_total_packets;
-  logic [31:0] push_count;
-  logic data_valid;
+  logic [31:0] cycle_count;
   logic is_counting;
 
   evt_counter #(
-      .MAX_COUNT(SAMPLING_CYCLES)
+      .MAX_COUNT(PACKET_COUNT)
   ) cycle_counter (
       .clk(clk_pixel),
       .rst(sys_rst),
@@ -129,30 +96,43 @@ module top_level (
       .rst(sys_rst),
       .evt(is_counting),
       .added_num(1),
-      .count(push_count)
+      .count(cycle_count)
   );
 
   assign cdc_dropped_packets = cdc_total_packets >> 1;
 
   always_ff @(posedge clk_pixel) begin
-    if (data_valid) begin
+    if (display_fifo_pop_valid) begin
       if (display_fifo_pop_ready) begin
-        data_valid <= 0;
+        display_fifo_pop_valid <= 0;
       end else begin
         is_counting <= 0;
       end
     end else begin
-      if (push_count == 9_999_999) begin
-        data_valid <= 1;
+      if (cycle_count == 9_999_999) begin
+        display_fifo_pop_valid <= 1;
       end
       is_counting <= 1;
     end
   end
 
 
-  // evt_counter#(.MAX_COUNT(SAMPLING_CYCLES)) cycle_counter(.clk(clk_50mhz), .rst(sys_rst), .evt(1), .added_num(1), .count(cycle_count));
 
-  // always_ff @(posedge clk_50mhz) begin
+  // ------------------------------------------------------------------------
+  // Counting Real Packets from Ethernet
+  // ------------------------------------------------------------------------
+
+  // logic display_fifo_push_ready;
+  // logic display_fifo_pop_valid;
+  // logic display_fifo_pop_ready;
+  // logic fifo_almost_full;
+  // logic fifo_almost_empty;
+  // logic network_statistics_valid;
+  // logic [31:0] fifo_packet_count;
+
+  // evt_counter#(.MAX_COUNT(SAMPLING_CYCLES)) cycle_counter(.clk(eth1_clk), .rst(sys_rst), .evt(1), .added_num(1), .count(cycle_count));
+
+  // always_ff @(posedge eth1_clk) begin
   //     if (sys_rst) begin
   //         packet_count <= 0;
   //         sys_rst_network_buf <= 2'b00;
@@ -180,24 +160,7 @@ module top_level (
   // Clock Domain Crossing Communication FIFO & Statistics Instantiation
   // ------------------------------------------------------------------------
 
-  // input wire 		sender_rst,
-  // input wire 		sender_clk,
-  // input wire 		sender_axis_tvalid,
-  // output logic 	sender_axis_tready,
-  // input wire [127:0] 	sender_axis_tdata,
-  // input wire 		sender_axis_tlast,
-  // output logic 	sender_axis_prog_full,
-
-  // input wire 		receiver_clk,
-  // output logic 	receiver_axis_tvalid,
-  // input wire 		receiver_axis_tready,
-  // output logic [127:0] receiver_axis_tdata,
-  // output logic 	receiver_axis_tlast,
-  // output logic 	receiver_axis_prog_empty
-
-  // We assume sender_axis_tready to always be ready since we are sending one statistic per second
-  // and the display channel is reading a new statistic every frame (60 fps)
-  // clockdomain_fifo display_fifo (.sender_rst(sys_rst_network_buf[0]), .sender_clk(clk_50mhz), .sender_axis_tvalid(network_statistics_valid), 
+  // clockdomain_fifo #(.DEPTH(), .PROGFULL_DEPTH())display_fifo_cdc (.sender_rst(sys_rst_network_buf[0]), .sender_clk(clk_50mhz), .sender_axis_tvalid(network_statistics_valid), 
   //                                     .sender_axis_tready(display_fifo_push_ready), .sender_axis_tdata(fifo_packet_count), .sender_axis_tlast(0), 
   //                                     .sender_axis_prog_full(fifo_almost_full), .receiver_clk(clk_pixel), .receiver_axis_tvalid(display_fifo_pop_valid), 
   //                                     .receiver_axis_tready(display_fifo_pop_ready), .receiver_axis_tdata(cdc_total_packets), .receiver_axis_prog_empty(fifo_almost_empty) );
@@ -243,10 +206,7 @@ module top_level (
       .rst_pixel(sys_rst),
 
       // Pop side of display_fifo
-      // .i_display_job_valid(display_fifo_pop_valid),
-      // .o_display_job_pop  (display_fifo_pop_ready),
-
-      .i_display_job_valid(data_valid),
+      .i_display_job_valid(display_fifo_pop_valid),
       .o_display_job_pop  (display_fifo_pop_ready),
 
       // Statistics input 
