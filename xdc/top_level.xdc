@@ -6,6 +6,11 @@ create_clock -add -name gclk -period 10.000 -waveform {0 4} [get_ports {clk_100m
 # Set Bank 0 voltage
 #set_property CFGBVS VCCO [current_design]
 #set_property CONFIG_VOLTAGE 3.3 [current_design]
+# new for week 6: avoid having Vivado freak out about clock domain crossing!
+
+# set_max_delay -datapath_only 6 -from  [get_clocks clk_pixel_cw_hdmi] -to [get_clocks clk_50mhz_unbuf]
+# set_max_delay -datapath_only 6 -from  [get_clocks clk_50mhz_unbuf] -to [get_clocks clk_pixel_cw_hdmi]
+
 
 # USER GREEN LEDS
 set_property -dict {PACKAGE_PIN C13  IOSTANDARD LVCMOS33} [ get_ports {led[0]} ]
