@@ -11,11 +11,4 @@ typedef struct packed {
   logic                          valid;  // 1=valid frame, 0=invalid/drop
 } packet_desc_t;
 
-typedef struct packed {
-  logic status;
-  logic [31:0] src_ip;
-  logic [31:0] dst_ip;
-  logic [15:0] src_port;
-  logic [15:0] dst_port;
-} display_job_t;
 `endif

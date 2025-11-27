@@ -1,5 +1,5 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_defs.svh"
+`include "packet_desc_t.svh"
 
 module eth_tx #(
     parameter int BUF_ID_BITS   = 2,

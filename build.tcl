@@ -22,11 +22,11 @@ if {[llength $files] != 0} {
 }
 
 # read in all system verilog files:
-set sources_sv [ glob ./hdl/*.sv ]
+set sources_sv [ glob -nocomplain ./hdl/*.sv ./hdl/*/*.sv ./hdl/*/*/*.sv ]
 read_verilog -sv $sources_sv
 
 # read in all (if any) verilog files:
-set sources_v [ glob -nocomplain ./hdl/*.v ]
+set sources_v [ glob -nocomplain ./hdl/*.v ./hdl/*/*.v ./hdl/*/*/*.v ]
 if {[llength $sources_v] > 0 } {
     read_verilog $sources_v
 }
