@@ -177,14 +177,14 @@ module top_level (
       .rst(sys_rst),
 
       // Ingress 
-      .eth1_clk(eth1_clk),
+      .eth1_clk  (eth1_clk),
       .eth1_crsdv(eth1_crsdv),
       .eth1_rxd  (eth1_rxd),
       .eth1_txen (eth1_txen),
       .eth1_txd  (eth1_txd),
 
       // Egress
-      .eth2_clk(eth2_clk),
+      .eth2_clk  (eth2_clk),
       .eth2_crsdv(eth2_crsdv),  // Pass-through
       .eth2_rxd  (eth2_rxd),    // Pass-through
       .eth2_txen (eth2_txen),   // Egress

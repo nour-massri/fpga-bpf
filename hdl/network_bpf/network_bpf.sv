@@ -12,7 +12,7 @@ module network_bpf (
     output logic [1:0] eth1_txd,
 
     // // Port 2 (Egress)
-    input wire eth2_clk, 
+    input wire eth2_clk,
     input wire eth2_crsdv,
     input wire [1:0] eth2_rxd,
     output logic eth2_txen,
@@ -159,7 +159,7 @@ module network_bpf (
   // ------------------------------------------------------------------------
   // Internal FIFO Instantiation
   // ------------------------------------------------------------------------
-  
+
   async_init_fifo #(
       .DATA_WIDTH(BUF_ID_BITS),
       .FIFO_DEPTH(FIFO_DEPTH),

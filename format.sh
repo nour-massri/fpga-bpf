@@ -1,1 +1,1 @@
-verible-verilog-format --inplace hdl/*
+verible-verilog-format --inplace ./hdl/*.* ./hdl/*/*.* ./hdl/*/*/*.* 
