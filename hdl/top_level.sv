@@ -23,14 +23,14 @@ module top_level (
     input wire eth1_crsdv,
     input wire [1:0] eth1_rxd,
     output logic eth1_txen,
-    output logic [1:0] eth1_txd
+    output logic [1:0] eth1_txd,
 
     // // Port 2 (Egress)
-    // input wire eth2_clk,
-    // input wire eth2_crsdv,
-    // input wire [1:0] eth2_rxd,
-    // output logic eth2_txen,
-    // output logic [1:0] eth2_txd
+    input wire eth2_clk,
+    input wire eth2_crsdv,
+    input wire [1:0] eth2_rxd,
+    output logic eth2_txen,
+    output logic [1:0] eth2_txd
 );
   //   // ------------------------------------------------------------------------
   //   // Buffer/FIFO Parameters
@@ -116,7 +116,9 @@ module top_level (
     end
   end
 
-
+  logic [31:0] total_bytes;
+  logic [31:0] recieved_packets;
+  logic [31:0] sent_packets;
 
   // ------------------------------------------------------------------------
   // Counting Real Packets from Ethernet
@@ -172,21 +174,21 @@ module top_level (
 
   // --- Networking + BPF ---
   network_bpf network_bpf_submodule (
-      .clk(eth1_clk),
       .rst(sys_rst),
 
       // Ingress 
+      .eth1_clk(eth1_clk),
       .eth1_crsdv(eth1_crsdv),
       .eth1_rxd  (eth1_rxd),
       .eth1_txen (eth1_txen),
       .eth1_txd  (eth1_txd),
 
       // Egress
-      // .eth2_clk(eth2_clk),
-      // .eth2_crsdv(eth2_crsdv),  // Pass-through
-      // .eth2_rxd  (eth2_rxd),    // Pass-through
-      // .eth2_txen (eth2_txen),   // Egress
-      // .eth2_txd  (eth2_txd),    // Egress
+      .eth2_clk(eth2_clk),
+      .eth2_crsdv(eth2_crsdv),  // Pass-through
+      .eth2_rxd  (eth2_rxd),    // Pass-through
+      .eth2_txen (eth2_txen),   // Egress
+      .eth2_txd  (eth2_txd),    // Egress
 
       //   // Push side of display_fifo
       //   .o_display_job_push (display_fifo_push_valid),

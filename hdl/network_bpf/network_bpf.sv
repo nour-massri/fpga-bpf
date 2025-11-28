@@ -2,21 +2,21 @@
 `include "packet_desc_t.svh"
 
 module network_bpf (
-    input wire clk,
     input wire rst,
 
     // Port 1 (Ingress)
+    input wire eth1_clk,
     input wire eth1_crsdv,
     input wire [1:0] eth1_rxd,
     output logic eth1_txen,
     output logic [1:0] eth1_txd,
 
     // // Port 2 (Egress)
-    // input wire eth2_clk, 
-    // input wire eth2_crsdv,
-    // input wire [1:0] eth2_rxd,
-    // output logic eth2_txen,
-    // output logic [1:0] eth2_txd,
+    input wire eth2_clk, 
+    input wire eth2_crsdv,
+    input wire [1:0] eth2_rxd,
+    output logic eth2_txen,
+    output logic [1:0] eth2_txd,
 
     // // Push side of display_fifo
     // output logic       o_display_job_push,
@@ -117,7 +117,7 @@ module network_bpf (
       .RAM_WIDTH(BRAM_WIDTH),
       .RAM_DEPTH(BRAM_DEPTH)
   ) bpf_packet_bram (
-      .clka(clk),
+      .clka(eth1_clk),
       .addra(rx_wr_addr),
       .dina(rx_wr_data),
       .wea(rx_wren),
@@ -134,11 +134,11 @@ module network_bpf (
       .doutb(bpf_rd_data)
   );
 
-  xilinx_true_dual_port_read_first_1_clock_ram #(
+  xilinx_true_dual_port_read_first_2_clock_ram #(
       .RAM_WIDTH(BRAM_WIDTH),
       .RAM_DEPTH(BRAM_DEPTH)
   ) tx_packet_bram (
-      .clka(clk),
+      .clka(eth1_clk),
       .addra(rx_wr_addr),
       .dina(rx_wr_data),
       .wea(rx_wren),
@@ -146,6 +146,7 @@ module network_bpf (
       .regcea(1'b1),
       .rsta(rst),
       .douta(),  // never read from this port 
+      .clkb(eth2_clk),
       .addrb(tx_rd_addr),
       .dinb(0),
       .web(1'b0),
@@ -158,17 +159,20 @@ module network_bpf (
   // ------------------------------------------------------------------------
   // Internal FIFO Instantiation
   // ------------------------------------------------------------------------
-
-  fifo #(
+  
+  async_init_fifo #(
       .DATA_WIDTH(BUF_ID_BITS),
       .FIFO_DEPTH(FIFO_DEPTH),
       .INIT_COUNT(NUM_BUFFERS)
   ) free_buf_fifo (
-      .clk(clk),
       .rst(rst),
+
+      .push_clk(eth2_clk),
       .i_push_data(free_buf_push_data),
       .i_push_valid(free_buf_push_valid),
       .o_full(free_buf_full),
+
+      .pop_clk(eth1_clk),
       .o_pop_data(free_buf_pop_data),
       .o_pop_valid(free_buf_pop_valid),
       .i_pop_ready(free_buf_pop_ready)
@@ -178,7 +182,7 @@ module network_bpf (
       .DATA_WIDTH($bits(packet_desc_t)),
       .FIFO_DEPTH(FIFO_DEPTH)
   ) bpf_work_fifo (
-      .clk(clk),
+      .clk(eth1_clk),
       .rst(rst),
       .i_push_data(bpf_work_push_data),
       .i_push_valid(bpf_work_push_valid),
@@ -188,15 +192,18 @@ module network_bpf (
       .i_pop_ready(bpf_work_pop_ready)
   );
 
-  fifo #(
+  async_fifo #(
       .DATA_WIDTH($bits(packet_desc_t)),
       .FIFO_DEPTH(FIFO_DEPTH)
   ) tx_work_fifo (
-      .clk(clk),
       .rst(rst),
+
+      .push_clk(eth1_clk),
       .i_push_data(tx_work_push_data),
       .i_push_valid(tx_work_push_valid),
       .o_full(tx_work_full),
+
+      .pop_clk(eth2_clk),
       .o_pop_data(tx_work_pop_data),
       .o_pop_valid(tx_work_pop_valid),
       .i_pop_ready(tx_work_pop_ready)
@@ -209,7 +216,7 @@ module network_bpf (
       .BUF_ID_BITS  (BUF_ID_BITS),
       .BUF_ADDR_BITS(BUF_ADDR_BITS)
   ) eth_rx (
-      .clk(clk),
+      .clk(eth1_clk),
       .rst(rst),
 
       .eth_crsdv(eth1_crsdv),
@@ -237,7 +244,7 @@ module network_bpf (
       .BUF_ID_BITS  (BUF_ID_BITS),
       .BUF_ADDR_BITS(BUF_ADDR_BITS)
   ) bpf_processor (
-      .clk(clk),
+      .clk(eth1_clk),
       .rst(rst),
 
       .i_bpf_work_desc (bpf_work_pop_data),
@@ -264,11 +271,11 @@ module network_bpf (
       .BUF_ID_BITS  (BUF_ID_BITS),
       .BUF_ADDR_BITS(BUF_ADDR_BITS)
   ) eth_tx (
-      .clk(clk),
+      .clk(eth2_clk),
       .rst(rst),
 
-      .eth_txen(eth1_txen),
-      .eth_txd (eth1_txd),
+      .eth_txen(eth2_txen),
+      .eth_txd (eth2_txd),
 
       .i_tx_work_desc (tx_work_pop_data),
       .i_tx_work_valid(tx_work_pop_valid),
@@ -292,7 +299,7 @@ module network_bpf (
   logic [31:0] egress_total_bytes, egress_received_packets, egress_sent_packets;
 
   network_bpf_statistics inress_stats (
-      .clk(clk),
+      .clk(eth1_clk),
       .rst(rst),
       .i_byte_active(pkt_ingress_byte_active),
       .i_pkt_recieved(pkt_ingress_received_pulse),
@@ -304,7 +311,7 @@ module network_bpf (
   );
 
   network_bpf_statistics egress_stats (
-      .clk(clk),
+      .clk(eth2_clk),
       .rst(rst),
       .i_byte_active(pkt_egress_byte_active),
       .i_pkt_recieved(pkt_egress_received_pulse),

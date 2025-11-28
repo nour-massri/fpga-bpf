@@ -95,15 +95,14 @@ set_property -dict {PACKAGE_PIN E5  IOSTANDARD LVCMOS33} [ get_ports "ss1_c[6]"]
 
 # PMOD A Signals
  
-# set_property -dict {PACKAGE_PIN F14 IOSTANDARD LVCMOS33}  [ get_ports "eth2_txd[0]" ] 
-# set_property -dict {PACKAGE_PIN F15 IOSTANDARD LVCMOS33}  [ get_ports "eth2_rxd[1]" ] 
-# set_property -dict {PACKAGE_PIN H13 IOSTANDARD LVCMOS33}  [ get_ports "eth2_crsdv" ]
+set_property -dict {PACKAGE_PIN F14 IOSTANDARD LVCMOS33}  [ get_ports "eth2_txd[0]" ] 
+set_property -dict {PACKAGE_PIN F15 IOSTANDARD LVCMOS33}  [ get_ports "eth2_rxd[1]" ] 
+set_property -dict {PACKAGE_PIN H13 IOSTANDARD LVCMOS33}  [ get_ports "eth2_crsdv" ]
 # #set_property -dict {PACKAGE_PIN H14 IOSTANDARD LVCMOS33}  [ get_ports "pmoda[3]" ] MOC_eth2
-# set_property -dict {PACKAGE_PIN J13 IOSTANDARD LVCMOS33}  [ get_ports "eth2_txen" ] 
-# set_property -dict {PACKAGE_PIN J14 IOSTANDARD LVCMOS33}  [ get_ports "eth2_rxd[0]" ]                                                                                                                     
-# set_property -dict {PACKAGE_PIN E14 IOSTANDARD LVCMOS33}  [ get_ports "eth2_clk" ]
-# # Allow the clock to travel on non-clock routing tracks (Dirt Road)
-# set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -of_objects [get_ports "eth2_clk"]]
+set_property -dict {PACKAGE_PIN J13 IOSTANDARD LVCMOS33}  [ get_ports "eth2_txen" ] 
+set_property -dict {PACKAGE_PIN E14 IOSTANDARD LVCMOS33}  [ get_ports "eth2_clk" ]
+# Allow the clock to travel on non-clock routing tracks (Dirt Road)
+set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -of_objects [get_ports "eth2_clk"]]
 # #set_property -dict {PACKAGE_PIN E15 IOSTANDARD LVCMOS33}  [ get_ports "pmoda[7]" ] MDIO_eth2
  
 # PMOD B Signals
@@ -124,7 +123,7 @@ set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -of_objects [get_ports "eth1_
 # set_property -dict {PACKAGE_PIN E16 IOSTANDARD LVCMOS33} [get_ports {jab[2]}] NC
 set_property -dict {PACKAGE_PIN G16 IOSTANDARD LVCMOS33} [get_ports "eth1_txd[1]"]
 #set_property -dict {PACKAGE_PIN C11 IOSTANDARD LVCMOS33} [get_ports {jab[4]}]
-# set_property -dict {PACKAGE_PIN D10 IOSTANDARD LVCMOS33} [get_ports "eth2_txd[1]"]
+set_property -dict {PACKAGE_PIN D10 IOSTANDARD LVCMOS33} [get_ports "eth2_txd[1]"]
  
  
 #HDMI Signals
