@@ -23,35 +23,35 @@
 `define BPF_MSH 5
 
 // ALU OP
-`define BPF_ADD 8'h00
-`define BPF_SUB 8'h10 
-`define BPF_MUL 8'h20
-`define BPF_DIV 8'h30
-`define BPF_OR  8'h40
-`define BPF_AND 8'h50
-`define BPF_LSH 8'h60
-`define BPF_RSH 8'h70
-`define BPF_NEG 8'h80
-`define BPF_MOD 8'h90
-`define BPF_XOR 8'ha0
+`define BPF_ADD 4'h0
+`define BPF_SUB 4'h1 
+`define BPF_MUL 4'h2
+`define BPF_DIV 4'h3
+`define BPF_OR  4'h4
+`define BPF_AND 4'h5
+`define BPF_LSH 4'h6
+`define BPF_RSH 4'h7
+`define BPF_NEG 4'h8
+`define BPF_MOD 4'h9
+`define BPF_XOR 4'ha
 
 // Jump OP
-`define BPF_JA   8'h00  // BPF_JMP only
-`define BPF_JEQ  8'h10
-`define BPF_JGT  8'h20
-`define BPF_JGE  8'h30
-`define BPF_JSET 8'h40 
+`define BPF_JA   4'h0  // BPF_JMP only
+`define BPF_JEQ  4'h1
+`define BPF_JGT  4'h2
+`define BPF_JGE  4'h3
+`define BPF_JSET 4'h4 
 
 `ifdef SYNTHESIS
 `define FPATH(X) `"X`"
 `else /* ! SYNTHESIS */
-`define FPATH(X) `"../bpf/X`"
+`define FPATH(X) `"../../bpf/X`"
 `endif  /* ! SYNTHESIS */
 
 module bpf_cpu #(
     parameter int PC_WIDTH = 8,
     parameter int BUF_ADDR_BITS = 11,
-		parameter int ROM_LATENCY = 1
+		parameter int ROM_LATENCY = 2
 ) (
     input wire clk,
     input wire rst,
@@ -87,11 +87,12 @@ module bpf_cpu #(
 	logic [7:0]  jt_offset_reg;
 	logic [7:0]  jf_offset_reg;
 	logic [31:0] immediate_reg;
+	logic src;
 
 	// rom interface and captured rom data
 	logic [PC_WIDTH-1:0] rom_addr;
 	logic [63:0] rom_data;        // output from ROM primitive
-	logic [63:0] rom_data_reg;    // captured after ROM_LATENCY cycles
+	// logic [63:0] rom_data_reg;    // captured after ROM_LATENCY cycles
 
 	// decoded small fields for easier use
 	logic [2:0] instruction_class;
@@ -100,15 +101,16 @@ module bpf_cpu #(
 	logic [7:0] op;
 	
 	logic [2:0] cycle_count;
-	localparam FIRST_BYTE = 2;
-	localparam SECOND_BYTE = 4;
-	localparam THIRD_BYTE = 6;
-	localparam FOURTH_BYTE = 8;
+	localparam FIRST_BYTE = 3;
+	localparam SECOND_BYTE = 6;
+	localparam THIRD_BYTE = 9;
+	localparam FOURTH_BYTE = 12;
 		
 	always_ff @(posedge clk) begin
 			if (rst) begin
 					state <= IDLE;
 					cycle_count <= 0;
+					rom_addr <= 0;
 			end else begin
 				case (state) 
 					IDLE: begin
@@ -122,23 +124,25 @@ module bpf_cpu #(
 					// Fetch instruction from ROM
 					FETCH: begin
 						if (cycle_count == ROM_LATENCY) begin
-							rom_data_reg <= rom_data;
 							cycle_count <= 0;
 							state <= DECODE;
 						end else begin
+							rom_addr <= pc;
 							cycle_count <= cycle_count + 1;
 						end
 					end
 
 					// Parse retreived ROM data
 					DECODE: begin
-						instruction_class <= rom_data_reg[2:0];
-						size <= rom_data_reg[4:3];
-						mode <= rom_data_reg[7:5];
-						op <= rom_data_reg[15:8];
-						jt_offset_reg <= rom_data_reg[23:16];
-						jf_offset_reg <= rom_data_reg[31:24];
-						immediate_reg <= rom_data_reg[63:32];
+						mode <= rom_data[55:53];
+						size <= rom_data[52:51];
+
+						op <= rom_data[55:52];
+						src <= rom_data[51];
+						instruction_class <= rom_data[50:48];
+						jt_offset_reg <= rom_data[47:40];
+						jf_offset_reg <= rom_data[39:32];
+						immediate_reg <= rom_data[31:0];
 						
 						// Reset cycle count for EXECUTE stage
 						cycle_count <= 0;
@@ -163,13 +167,13 @@ module bpf_cpu #(
 								if (op == `BPF_JA) begin
 										pc <= pc + immediate_reg;
 								end else if (op == `BPF_JEQ) begin
-										pc <= (A == immediate_reg) ? pc + jt_offset_reg : pc + jf_offset_reg;
+										pc <= (A == immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
 								end else if (op == `BPF_JGT) begin
-										pc <= (A > immediate_reg) ? pc + jt_offset_reg : pc + jf_offset_reg;
+										pc <= (A > immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
 								end else if (op == `BPF_JGE) begin
-										pc <= (A >= immediate_reg) ? pc + jt_offset_reg : pc + jf_offset_reg;
+										pc <= (A >= immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
 								end else if (op == `BPF_JSET) begin
-										pc <= ((A & immediate_reg) != 0) ? pc + jt_offset_reg: pc + jf_offset_reg;
+										pc <= ((A & immediate_reg) != 0) ? pc + jt_offset_reg + 1: pc + jf_offset_reg + 1;
 								end else begin
 										pc <= pc + 1;
 								end
@@ -194,6 +198,7 @@ module bpf_cpu #(
 									end else if (size == `BPF_HALFWORD) begin
 										if (cycle_count == FIRST_BYTE) begin
 											A <= i_ram_data;
+											cycle_count <= cycle_count + 1;
 										end else if (cycle_count == SECOND_BYTE) begin
 											A <= {A[7:0], i_ram_data};
 											pc <= pc + 1;
@@ -205,10 +210,13 @@ module bpf_cpu #(
 									end else if (size == `BPF_WORD) begin
 										if (cycle_count == FIRST_BYTE) begin
 											A <= i_ram_data;
+											cycle_count <= cycle_count + 1;
 										end else if(cycle_count == SECOND_BYTE) begin
 											A <= {A[7:0], i_ram_data};
+											cycle_count <= cycle_count + 1;
 										end else if (cycle_count == THIRD_BYTE) begin 
 											A <= {A[15:0], i_ram_data};
+											cycle_count <= cycle_count + 1;
 										end else if (cycle_count == FOURTH_BYTE) begin 
 											A <= {A[23:0], i_ram_data};
 											pc <= pc + 1;
@@ -242,15 +250,13 @@ module bpf_cpu #(
 
 	logic [BUF_ADDR_BITS-1:0] base_addr;
 	always_comb begin
-		if (state == FETCH) begin
-			rom_addr = pc;
-		end
+	
 	
 	 	o_ram_rd_en = 1'b0;
     o_ram_addr  = '0;
 		if (state == EXECUTE && instruction_class == `BPF_LD && mode == `BPF_ABS) begin
 			// address includes +2 offset because of preamble
-			base_addr = immediate_reg + 2;
+			base_addr = immediate_reg;
 			if (size == `BPF_BYTE) begin
 				if (cycle_count == 0) begin
 					o_ram_rd_en = 1'b1;
@@ -289,7 +295,7 @@ module bpf_cpu #(
   xilinx_single_port_ram_read_first #(
       .RAM_WIDTH(64),            
       .RAM_DEPTH(256),           
-      .RAM_PERFORMANCE("LOW_LATENCY"), 
+      .RAM_PERFORMANCE("HIGH_PERFORMANCE"), 
       .INIT_FILE(`FPATH(ip_and_udp.mem))
   ) instr_rom (
       .addra(rom_addr),
