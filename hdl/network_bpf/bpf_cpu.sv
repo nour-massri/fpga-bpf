@@ -10,9 +10,9 @@
 `define BPF_RET 6
 
 // Sizes
-`define BPF_WORD     0
+`define BPF_WORD 0
 `define BPF_HALFWORD 1
-`define BPF_BYTE     2
+`define BPF_BYTE 2
 
 // Load Modes
 `define BPF_IMM 0  // Load the constant 0x80 into A
@@ -83,24 +83,21 @@ module bpf_cpu #(
 	logic [31:0] X;
 
 	// Instruction parts
-	logic [15:0] opcode_reg;
 	logic [7:0]  jt_offset_reg;
 	logic [7:0]  jf_offset_reg;
 	logic [31:0] immediate_reg;
-	logic src;
-
-	// rom interface and captured rom data
-	logic [PC_WIDTH-1:0] rom_addr;
-	logic [63:0] rom_data;        // output from ROM primitive
-	// logic [63:0] rom_data_reg;    // captured after ROM_LATENCY cycles
-
-	// decoded small fields for easier use
 	logic [2:0] instruction_class;
 	logic [1:0] size;
 	logic [2:0] mode;
 	logic [7:0] op;
+	logic src;
+
+	// rom interface and captured rom data
+	logic [PC_WIDTH-1:0] rom_addr;
+	logic [63:0] rom_data;        
 	
-	logic [2:0] cycle_count;
+	
+	logic [4:0] cycle_count;
 	localparam FIRST_BYTE = 3;
 	localparam SECOND_BYTE = 6;
 	localparam THIRD_BYTE = 9;
@@ -108,13 +105,39 @@ module bpf_cpu #(
 		
 	always_ff @(posedge clk) begin
 			if (rst) begin
-					state <= IDLE;
-					cycle_count <= 0;
-					rom_addr <= 0;
+				state <= IDLE;
+				cycle_count <= 0;
+				rom_addr <= 0;
+				instruction_class <=0;
+				size <= 0;
+				mode <= 0;
+				op <= 0;
+				src <= 0;
+				jt_offset_reg <= 0;
+				jf_offset_reg <= 0;
+				pc <= 0;
+				A <= 0;
+				X <= 0;
+				o_done <= 0;
+				o_pass_packet <= 0;
 			end else begin
 				case (state) 
 					IDLE: begin
+						state <= IDLE;
 						cycle_count <= 0;
+						rom_addr <= 0;
+						instruction_class <=0;
+						size <= 0;
+						mode <= 0;
+						op <= 0;
+						src <= 0;
+						jt_offset_reg <= 0;
+						jf_offset_reg <= 0;
+						pc <= 0;
+						A <= 0;
+						X <= 0;
+						o_done <= 0;
+						o_pass_packet <= 0;
 						if (i_start) begin
 							pc <= 0;
 							state <= FETCH;
@@ -139,6 +162,7 @@ module bpf_cpu #(
 
 						op <= rom_data[55:52];
 						src <= rom_data[51];
+
 						instruction_class <= rom_data[50:48];
 						jt_offset_reg <= rom_data[47:40];
 						jf_offset_reg <= rom_data[39:32];
@@ -192,7 +216,7 @@ module bpf_cpu #(
 											pc <= pc + 1;
 											state <= FETCH;
 											cycle_count <= 0;
-										end begin 
+										end else begin 
 											cycle_count <= cycle_count + 1;
 										end
 									end else if (size == `BPF_HALFWORD) begin
@@ -231,6 +255,7 @@ module bpf_cpu #(
 									end
 								end 
 							end
+
 							default: begin
 								// unimplemented classes
 								pc <= pc + 1;
@@ -250,10 +275,8 @@ module bpf_cpu #(
 
 	logic [BUF_ADDR_BITS-1:0] base_addr;
 	always_comb begin
-	
-	
 	 	o_ram_rd_en = 1'b0;
-    o_ram_addr  = '0;
+    	o_ram_addr  = '0;
 		if (state == EXECUTE && instruction_class == `BPF_LD && mode == `BPF_ABS) begin
 			// address includes +2 offset because of preamble
 			base_addr = immediate_reg;
