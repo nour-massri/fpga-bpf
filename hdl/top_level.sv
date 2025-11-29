@@ -172,6 +172,10 @@ module top_level (
   // Submodule Instantiation
   // ------------------------------------------------------------------------
 
+  logic [31:0] total_bytes;
+  logic [31:0] sent_packets;
+  logic [31:0] recieved_packets;
+
   // --- Networking + BPF ---
   network_bpf network_bpf_submodule (
       .rst(sys_rst),
