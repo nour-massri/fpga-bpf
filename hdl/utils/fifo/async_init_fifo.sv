@@ -7,11 +7,11 @@ module async_init_fifo #(
 ) (
     input wire rst,
 
-    // Push side  
+    // Push side
     input wire push_clk,
     input wire [DATA_WIDTH-1:0] i_push_data,
     input wire i_push_valid,
-    output logic o_full,
+    output logic o_push_ready,
 
     // Pop side 
     input wire pop_clk,
@@ -20,12 +20,9 @@ module async_init_fifo #(
     input wire i_pop_ready
 );
 
-  logic [DATA_WIDTH-1:0] return_data;
-  logic return_valid;
-  logic return_full;
-  logic return_ready;
-
-  assign return_ready = ~return_full;
+  logic [DATA_WIDTH-1:0] internal_push_data;
+  logic internal_push_valid;
+  logic internal_push_ready;
 
   async_fifo #(
       .DATA_WIDTH(DATA_WIDTH),
@@ -36,12 +33,12 @@ module async_init_fifo #(
       .push_clk(push_clk),
       .i_push_data(i_push_data),
       .i_push_valid(i_push_valid),
-      .o_full(o_full),
+      .o_push_ready(o_push_ready),
 
       .pop_clk(pop_clk),
-      .o_pop_data(return_data),
-      .o_pop_valid(return_valid),
-      .i_pop_ready(return_ready)
+      .o_pop_data(internal_push_data),
+      .o_pop_valid(internal_push_valid),
+      .i_pop_ready(internal_push_ready)
   );
 
   fifo #(
@@ -52,9 +49,9 @@ module async_init_fifo #(
       .clk(pop_clk),
       .rst(rst),
 
-      .i_push_data(return_data),
-      .i_push_valid(return_valid),
-      .o_full(return_full),
+      .i_push_data (internal_push_data),
+      .i_push_valid(internal_push_valid),
+      .o_push_ready(internal_push_ready),
 
       .o_pop_data (o_pop_data),
       .o_pop_valid(o_pop_valid),

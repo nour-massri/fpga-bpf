@@ -12,14 +12,14 @@ module eth_rx #(
     input wire [1:0] eth_rxd,
 
     // Pop side of free_buffer fifo
-    input wire [BUF_ID_BITS-1:0] i_free_buf_id,
-    input wire i_free_buf_valid,
-    output logic o_free_buf_pop,
+    input wire [BUF_ID_BITS-1:0] i_free_buf_pop_data,
+    input wire i_free_buf_pop_valid,
+    output logic o_free_buf_pop_ready,
 
     // Push side of bpf_work fifo
-    output packet_desc_t o_bpf_work_desc,
-    output logic o_bpf_work_push,
-    input wire i_bpf_work_full,
+    output packet_desc_t o_bpf_work_push_data,
+    output logic o_bpf_work_push_valid,
+    input wire i_bpf_work_push_ready,
 
     // BRAM write 
     output logic o_wren,
@@ -87,14 +87,14 @@ module eth_rx #(
 
   always_comb begin
     next_state = state;
-    o_free_buf_pop = 1'b0;
-    o_bpf_work_push = 1'b0;
+    o_free_buf_pop_ready = 1'b0;
+    o_bpf_work_push_valid = 1'b0;
 
     case (state)
       WAIT_FOR_BUF: begin
-        if (i_free_buf_valid) begin
+        if (i_free_buf_pop_valid) begin
           if (carrier_detected) begin
-            // mid-packet don't start 
+            // mid-packet don't start
             next_state = WAIT_FOR_IFG;
           end else begin
             next_state = IDLE;
@@ -102,18 +102,18 @@ module eth_rx #(
         end
       end
       WAIT_FOR_IFG: begin
-        if (!i_free_buf_valid) begin
+        if (!i_free_buf_pop_valid) begin
           next_state = WAIT_FOR_BUF;
         end else if (!carrier_detected) begin
           next_state = IDLE;
         end
       end
       IDLE: begin
-        if (!i_free_buf_valid) begin
+        if (!i_free_buf_pop_valid) begin
           next_state = WAIT_FOR_BUF;
         end else if (carrier_detected) begin
-          o_free_buf_pop = 1'b1;
-          next_state     = RECEIVE_DATA;
+          o_free_buf_pop_ready = 1'b1;
+          next_state           = RECEIVE_DATA;
         end
       end
       RECEIVE_DATA: begin
@@ -123,9 +123,9 @@ module eth_rx #(
         // TODO: add crc check and packet length check
       end
       PUSH_WORK: begin
-        // block until can push descriptor (shouldn't happen)  
-        if (!i_bpf_work_full) begin
-          o_bpf_work_push = 1'b1;
+        // block until can push descriptor (shouldn't happen)
+        if (i_bpf_work_push_ready) begin
+          o_bpf_work_push_valid = 1'b1;
           next_state = WAIT_FOR_BUF;
         end
       end
@@ -137,8 +137,8 @@ module eth_rx #(
   //=========================================================================
 
   always_ff @(posedge clk) begin
-    if (o_free_buf_pop) begin
-      current_buf_id <= i_free_buf_id;
+    if (o_free_buf_pop_ready) begin
+      current_buf_id <= i_free_buf_pop_data;
     end
   end
 
@@ -163,16 +163,16 @@ module eth_rx #(
   assign o_wr_data = byte_data;
 
   // BPF Work Queue
-  assign o_bpf_work_desc.id    = current_buf_id;
-  assign o_bpf_work_desc.len   = byte_cnt;
-  assign o_bpf_work_desc.valid = pkt_is_valid; // TODO: CRC check result
+  assign o_bpf_work_push_data.id    = current_buf_id;
+  assign o_bpf_work_push_data.len   = byte_cnt;
+  assign o_bpf_work_push_data.valid = pkt_is_valid; // TODO: CRC check result
 
   // Statistics
   always_ff @(posedge clk) begin
-    o_pkt_received_pulse <= o_free_buf_pop;
+    o_pkt_received_pulse <= o_free_buf_pop_ready;
     o_byte_active <= byte_valid;
     // TODO: Implement proper drop logic
-    o_pkt_sent_pulse <= o_bpf_work_push;
+    o_pkt_sent_pulse <= o_bpf_work_push_valid;
   end
 
 endmodule

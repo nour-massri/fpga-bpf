@@ -11,7 +11,7 @@ module fifo #(
     // Push interface
     input wire [DATA_WIDTH-1:0] i_push_data,
     input wire i_push_valid,
-    output logic o_full,
+    output logic o_push_ready,
 
     // Pop interface
     output logic [DATA_WIDTH-1:0] o_pop_data,
@@ -24,13 +24,13 @@ module fifo #(
   logic [$clog2(FIFO_DEPTH)-1:0] wr_ptr;
   logic [$clog2(FIFO_DEPTH)-1:0] rd_ptr;
 
-  assign o_full = (count == FIFO_DEPTH);
-  assign o_pop_valid = !(count == 0);
-  assign o_pop_data = mem[rd_ptr];
+  assign o_push_ready = (count != FIFO_DEPTH);
+  assign o_pop_valid  = !(count == 0);
+  assign o_pop_data   = mem[rd_ptr];
 
   logic do_pop, do_push;
   assign do_pop  = o_pop_valid && i_pop_ready;
-  assign do_push = i_push_valid && !o_full;
+  assign do_push = i_push_valid && o_push_ready;
 
   always_ff @(posedge clk) begin
     if (rst) begin

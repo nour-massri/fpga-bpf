@@ -9,14 +9,14 @@ module bpf_processor #(
     input wire rst,
 
     // Pop side of bpf_work fifo
-    input packet_desc_t i_bpf_work_desc,
-    input wire i_bpf_work_valid,
-    output logic o_bpf_work_pop,
+    input packet_desc_t i_bpf_work_pop_data,
+    input wire i_bpf_work_pop_valid,
+    output logic o_bpf_work_pop_ready,
 
     // Push side of tx_work fifo
-    output packet_desc_t o_tx_work_desc,
-    output logic o_tx_work_push,
-    input wire i_tx_work_full,
+    output packet_desc_t o_tx_work_push_data,
+    output logic o_tx_work_push_valid,
+    input wire i_tx_work_push_ready,
 
     // BRAM read packet
     output logic o_rd_en,
@@ -80,14 +80,14 @@ module bpf_processor #(
 
   always_comb begin
     next_state = state;
-    o_bpf_work_pop = 1'b0;
-    o_tx_work_push = 1'b0;
+    o_bpf_work_pop_ready = 1'b0;
+    o_tx_work_push_valid = 1'b0;
     cpu_start = 1'b0;
 
     case (state)
       IDLE: begin
-        if (i_bpf_work_valid) begin
-          o_bpf_work_pop = 1'b1;
+        if (i_bpf_work_pop_valid) begin
+          o_bpf_work_pop_ready = 1'b1;
           next_state = CHECK_VALIDITY;
         end
       end
@@ -108,8 +108,8 @@ module bpf_processor #(
         end
       end
       PUSH_WORK: begin
-        if (!i_tx_work_full) begin
-          o_tx_work_push = 1'b1;
+        if (i_tx_work_push_ready) begin
+          o_tx_work_push_valid = 1'b1;
           next_state = IDLE;
         end
       end
@@ -124,8 +124,8 @@ module bpf_processor #(
       desc_reg <= '0;
       final_decision_pass <= 1'b0;
     end else begin
-      if (state == IDLE && i_bpf_work_valid) begin
-        desc_reg <= i_bpf_work_desc;
+      if (state == IDLE && i_bpf_work_pop_valid) begin
+        desc_reg <= i_bpf_work_pop_data;
       end else if (state == CHECK_VALIDITY) begin
         if (!desc_reg.valid) begin
           final_decision_pass <= 1'b0;
@@ -146,9 +146,9 @@ module bpf_processor #(
   assign o_buf_id = desc_reg.id;
 
   // TX Work Queue
-  assign o_tx_work_desc.id = desc_reg.id;
-  assign o_tx_work_desc.len = desc_reg.len;
-  assign o_tx_work_desc.valid = final_decision_pass;
+  assign o_tx_work_push_data.id = desc_reg.id;
+  assign o_tx_work_push_data.len = desc_reg.len;
+  assign o_tx_work_push_data.valid = final_decision_pass;
 
   // ------------------------------------------------------------------------
   // Statistics

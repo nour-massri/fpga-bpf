@@ -18,11 +18,6 @@ module network_bpf (
     output logic eth2_txen,
     output logic [1:0] eth2_txd,
 
-    // // Push side of display_fifo
-    // output logic       o_display_job_push,
-    // output display_job_t o_display_job_data,
-    // input wire         i_display_fifo_full,
-
     // Statistics output 
     output logic [31:0] o_total_bytes,
     output logic [31:0] o_recieved_packets,
@@ -51,7 +46,7 @@ module network_bpf (
   // --- 1. Free Buffer FIFO (buffer IDs) ---
   logic         [   BUF_ID_BITS-1:0] free_buf_push_data;
   logic                              free_buf_push_valid;
-  logic                              free_buf_full;
+  logic                              free_buf_push_ready;
   logic         [   BUF_ID_BITS-1:0] free_buf_pop_data;
   logic                              free_buf_pop_valid;
   logic                              free_buf_pop_ready;
@@ -59,7 +54,7 @@ module network_bpf (
   // --- 2. BPF Work FIFO (packet_desc_t) ---
   packet_desc_t                      bpf_work_push_data;
   logic                              bpf_work_push_valid;
-  logic                              bpf_work_full;
+  logic                              bpf_work_push_ready;
   packet_desc_t                      bpf_work_pop_data;
   logic                              bpf_work_pop_valid;
   logic                              bpf_work_pop_ready;
@@ -67,7 +62,7 @@ module network_bpf (
   // --- 3. TX Work FIFO (packet_desc_t) ---
   packet_desc_t                      tx_work_push_data;
   logic                              tx_work_push_valid;
-  logic                              tx_work_full;
+  logic                              tx_work_push_ready;
   packet_desc_t                      tx_work_pop_data;
   logic                              tx_work_pop_valid;
   logic                              tx_work_pop_ready;
@@ -170,7 +165,7 @@ module network_bpf (
       .push_clk(eth2_clk),
       .i_push_data(free_buf_push_data),
       .i_push_valid(free_buf_push_valid),
-      .o_full(free_buf_full),
+      .o_push_ready(free_buf_push_ready),
 
       .pop_clk(eth1_clk),
       .o_pop_data(free_buf_pop_data),
@@ -186,7 +181,7 @@ module network_bpf (
       .rst(rst),
       .i_push_data(bpf_work_push_data),
       .i_push_valid(bpf_work_push_valid),
-      .o_full(bpf_work_full),
+      .o_push_ready(bpf_work_push_ready),
       .o_pop_data(bpf_work_pop_data),
       .o_pop_valid(bpf_work_pop_valid),
       .i_pop_ready(bpf_work_pop_ready)
@@ -201,7 +196,7 @@ module network_bpf (
       .push_clk(eth1_clk),
       .i_push_data(tx_work_push_data),
       .i_push_valid(tx_work_push_valid),
-      .o_full(tx_work_full),
+      .o_push_ready(tx_work_push_ready),
 
       .pop_clk(eth2_clk),
       .o_pop_data(tx_work_pop_data),
@@ -222,13 +217,13 @@ module network_bpf (
       .eth_crsdv(eth1_crsdv),
       .eth_rxd  (eth1_rxd),
 
-      .i_free_buf_id(free_buf_pop_data),
-      .i_free_buf_valid(free_buf_pop_valid),
-      .o_free_buf_pop(free_buf_pop_ready),
+      .i_free_buf_pop_data (free_buf_pop_data),
+      .i_free_buf_pop_valid(free_buf_pop_valid),
+      .o_free_buf_pop_ready(free_buf_pop_ready),
 
-      .o_bpf_work_desc(bpf_work_push_data),
-      .o_bpf_work_push(bpf_work_push_valid),
-      .i_bpf_work_full(bpf_work_full),
+      .o_bpf_work_push_data (bpf_work_push_data),
+      .o_bpf_work_push_valid(bpf_work_push_valid),
+      .i_bpf_work_push_ready(bpf_work_push_ready),
 
       .o_wren(rx_wren),
       .o_buf_id(rx_buf_id_out),
@@ -247,17 +242,13 @@ module network_bpf (
       .clk(eth1_clk),
       .rst(rst),
 
-      .i_bpf_work_desc (bpf_work_pop_data),
-      .i_bpf_work_valid(bpf_work_pop_valid),
-      .o_bpf_work_pop  (bpf_work_pop_ready),
+      .i_bpf_work_pop_data (bpf_work_pop_data),
+      .i_bpf_work_pop_valid(bpf_work_pop_valid),
+      .o_bpf_work_pop_ready(bpf_work_pop_ready),
 
-      .o_tx_work_desc(tx_work_push_data),
-      .o_tx_work_push(tx_work_push_valid),
-      .i_tx_work_full(tx_work_full),
-
-      // .o_display_job_push(o_display_job_push),
-      // .o_display_job_data(o_display_job_data),
-      // .i_display_fifo_full(i_display_fifo_full),
+      .o_tx_work_push_data (tx_work_push_data),
+      .o_tx_work_push_valid(tx_work_push_valid),
+      .i_tx_work_push_ready(tx_work_push_ready),
 
       .o_rd_en  (bpf_rd_en),
       .o_buf_id (bpf_buf_id_out),
@@ -277,13 +268,13 @@ module network_bpf (
       .eth_txen(eth2_txen),
       .eth_txd (eth2_txd),
 
-      .i_tx_work_desc (tx_work_pop_data),
-      .i_tx_work_valid(tx_work_pop_valid),
-      .o_tx_work_pop  (tx_work_pop_ready),
+      .i_tx_work_pop_data (tx_work_pop_data),
+      .i_tx_work_pop_valid(tx_work_pop_valid),
+      .o_tx_work_pop_ready(tx_work_pop_ready),
 
-      .o_ret_buf_id(free_buf_push_data),
-      .o_ret_buf_push(free_buf_push_valid),
-      .i_ret_buf_ready(!free_buf_full),
+      .o_free_buf_push_data (free_buf_push_data),
+      .o_free_buf_push_valid(free_buf_push_valid),
+      .i_free_buf_push_ready(free_buf_push_ready),
 
       .o_rd_en  (tx_rd_en),
       .o_buf_id (tx_buf_id_out),

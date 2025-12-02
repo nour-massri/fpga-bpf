@@ -13,14 +13,14 @@ module eth_tx #(
     output logic [1:0] eth_txd,
 
     // Pop side of tx_work fifo
-    input packet_desc_t i_tx_work_desc,
-    input wire i_tx_work_valid,
-    output logic o_tx_work_pop,
+    input packet_desc_t i_tx_work_pop_data,
+    input wire i_tx_work_pop_valid,
+    output logic o_tx_work_pop_ready,
 
-    // Push side of free_buffer fifo
-    output logic [BUF_ID_BITS-1:0] o_ret_buf_id,
-    output logic o_ret_buf_push,
-    input wire i_ret_buf_ready,
+    // Push side of free_buffer fifo (return buffer)
+    output logic [BUF_ID_BITS-1:0] o_free_buf_push_data,
+    output logic o_free_buf_push_valid,
+    input wire i_free_buf_push_ready,
 
     // BRAM read 
     output logic o_rd_en,
@@ -74,13 +74,13 @@ module eth_tx #(
 
   always_comb begin
     next_state = state;
-    o_tx_work_pop = 1'b0;
-    o_ret_buf_push = 1'b0;
+    o_tx_work_pop_ready = 1'b0;
+    o_free_buf_push_valid = 1'b0;
 
     case (state)
       IDLE: begin
-        if (i_tx_work_valid) begin
-          o_tx_work_pop = 1'b1;
+        if (i_tx_work_pop_valid) begin
+          o_tx_work_pop_ready = 1'b1;
           next_state = FILTER_DESC;
         end
       end
@@ -92,7 +92,7 @@ module eth_tx #(
         end
       end
       PREFETCH: begin
-        // prefetch byte 0 requested inFILTER_DESC 
+        // prefetch byte 0 requested inFILTER_DESC
         next_state = SEND_FRAME;
       end
       SEND_FRAME: begin
@@ -105,8 +105,8 @@ module eth_tx #(
         if (ifg_counter == 48) next_state = RETURN_BUF;
       end
       RETURN_BUF: begin
-        if (i_ret_buf_ready) begin
-          o_ret_buf_push = 1'b1;
+        if (i_free_buf_push_ready) begin
+          o_free_buf_push_valid = 1'b1;
           next_state = IDLE;
         end
       end
@@ -133,13 +133,13 @@ module eth_tx #(
   always_ff @(posedge clk) begin
     if (state == IDLE) begin
       byte_cnt <= 0;
-      if (i_tx_work_valid) begin
-        current_packet_valid <= i_tx_work_desc.valid;
-        current_buf_id <= i_tx_work_desc.id;
-        packet_len <= i_tx_work_desc.len;
+      if (i_tx_work_pop_valid) begin
+        current_packet_valid <= i_tx_work_pop_data.valid;
+        current_buf_id <= i_tx_work_pop_data.id;
+        packet_len <= i_tx_work_pop_data.len;
       end
     end else if (state == FILTER_DESC) begin
-      byte_cnt <= 1;  // fetch byte 1 
+      byte_cnt <= 1;  // fetch byte 1
     end else if (state == SEND_FRAME && tick_cnt == 3) begin
       if (byte_cnt < packet_len) byte_cnt <= byte_cnt + 1;
     end
@@ -173,14 +173,14 @@ module eth_tx #(
   assign o_buf_id = current_buf_id;
   assign o_rd_addr = byte_cnt;
 
-  assign o_ret_buf_id = current_buf_id;
+  assign o_free_buf_push_data = current_buf_id;
 
   // ------------------------------------------------------------------------
   // Statistics
   // ------------------------------------------------------------------------
 
   always_ff @(posedge clk) begin
-    o_pkt_received_pulse <= o_tx_work_pop;
+    o_pkt_received_pulse <= o_tx_work_pop_ready;
     o_byte_active <= (state == SEND_FRAME) && (tick_cnt == 3);
     o_pkt_sent_pulse <= (state == PREFETCH);
   end

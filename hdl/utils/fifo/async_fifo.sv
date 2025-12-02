@@ -10,7 +10,7 @@ module async_fifo #(
     input wire push_clk,
     input wire [DATA_WIDTH-1:0] i_push_data,
     input wire i_push_valid,
-    output logic o_full,
+    output logic o_push_ready,
 
     // Pop side
     input wire pop_clk,
@@ -30,12 +30,6 @@ module async_fifo #(
   assign s_axis_tdata_padded = {{PAD_WIDTH{1'b0}}, i_push_data};
   assign o_pop_data = m_axis_tdata_padded[DATA_WIDTH-1:0];
 
-  logic internal_push_ready;
-  logic internal_pop_valid;
-
-  assign o_full = ~internal_push_ready;
-  assign o_pop_valid = internal_pop_valid;
-
   xpm_fifo_axis #(
       .CASCADE_HEIGHT(0),
       .CDC_SYNC_STAGES(3),
@@ -54,7 +48,7 @@ module async_fifo #(
       // Receiver (pop) side
       .m_aclk(pop_clk),
       .m_axis_tdata(m_axis_tdata_padded),
-      .m_axis_tvalid(internal_pop_valid),
+      .m_axis_tvalid(o_pop_valid),
       .m_axis_tready(i_pop_ready),
       .m_axis_tlast(),
       .m_axis_tdest(),
@@ -68,7 +62,7 @@ module async_fifo #(
       .s_aresetn(~rst),
       .s_axis_tdata(s_axis_tdata_padded),
       .s_axis_tvalid(i_push_valid),
-      .s_axis_tready(internal_push_ready),
+      .s_axis_tready(o_push_ready),
       .s_axis_tlast(1'b0),
       .s_axis_tdest(0),
       .s_axis_tid(0),
