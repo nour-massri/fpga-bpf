@@ -15,17 +15,20 @@ dst_ip = "8.8.8.8"
 src_port = 12345
 dst_port = 53
 
-eth = Ether(dst=dst_mac, src=src_mac, type=0x0800)
-ip = IP(src=src_ip, dst=dst_ip, proto=17) # proto=17 for UDP
-udp = UDP(sport=src_port, dport=dst_port)
-payload = b"hello world from scapy"
-pkt = eth / ip / udp / payload
-
-print("Frame size:", len(bytes(pkt)), "Frame summary:", pkt.summary())
-hexdump(bytes(pkt))
-
 count = 10
 if len(sys.argv) > 1:
     count = int(sys.argv[1])
 
-sendp(pkt, iface=iface, count=count, inter=0.1)
+# Send packets with incrementing source IP addresses
+for i in range(count):
+    current_src_ip = f"192.168.1.{100 + i}"
+
+    eth = Ether(dst=dst_mac, src=src_mac, type=0x0800)
+    ip = IP(src=current_src_ip, dst=dst_ip, proto=17) # proto=17 for UDP
+    udp = UDP(sport=src_port, dport=dst_port)
+    payload = f"packet {i}".encode()  # Label each packet
+    pkt = eth / ip / udp / payload
+
+    print(f"Sending packet {i}: src_ip={current_src_ip}, Frame size: {len(bytes(pkt))}")
+
+    sendp(pkt, iface=iface, count=1, inter=0.1, verbose=False)
