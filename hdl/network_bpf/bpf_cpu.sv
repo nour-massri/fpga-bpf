@@ -67,269 +67,273 @@ module bpf_cpu #(
     output logic [BUF_ADDR_BITS-1:0] o_ram_addr,
     input wire [7:0] i_ram_data
 );
+  assign o_done = 1'b1;
+  assign o_pass_packet = 1'b1;
+  assign o_ram_rd_en = 1'b0;
+  assign o_ram_addr = 0;
+  // typedef enum logic [2:0] {
+  //   IDLE,
+  //   FETCH,
+  //   DECODE,
+  //   EXECUTE
+  // } state_t;
 
-  typedef enum logic [2:0] {
-    IDLE,
-    FETCH,
-    DECODE,
-    EXECUTE
-  } state_t;
+  // state_t state;
 
-  state_t state;
+  // // Registers
+  // logic [31:0] pc;
+  // logic [31:0] A;
+  // logic [31:0] X;
 
-  // Registers
-  logic [31:0] pc;
-  logic [31:0] A;
-  logic [31:0] X;
+  // // Instruction parts
+  // logic [7:0] jt_offset_reg;
+  // logic [7:0] jf_offset_reg;
+  // logic [31:0] immediate_reg;
+  // logic [2:0] instruction_class;
+  // logic [1:0] size;
+  // logic [2:0] mode;
+  // logic [7:0] op;
+  // logic src;
 
-  // Instruction parts
-  logic [7:0] jt_offset_reg;
-  logic [7:0] jf_offset_reg;
-  logic [31:0] immediate_reg;
-  logic [2:0] instruction_class;
-  logic [1:0] size;
-  logic [2:0] mode;
-  logic [7:0] op;
-  logic src;
-
-  // rom interface and captured rom data
-  logic [PC_WIDTH-1:0] rom_addr;
-  logic [63:0] rom_data;
-
-
-  logic [4:0] cycle_count;
-  localparam FIRST_BYTE = 3;
-  localparam SECOND_BYTE = 6;
-  localparam THIRD_BYTE = 9;
-  localparam FOURTH_BYTE = 12;
-
-  always_ff @(posedge clk) begin
-    if (rst) begin
-      state <= IDLE;
-      cycle_count <= 0;
-      rom_addr <= 0;
-      instruction_class <= 0;
-      size <= 0;
-      mode <= 0;
-      op <= 0;
-      src <= 0;
-      jt_offset_reg <= 0;
-      jf_offset_reg <= 0;
-      pc <= 0;
-      A <= 0;
-      X <= 0;
-      o_done <= 0;
-      o_pass_packet <= 0;
-    end else begin
-      case (state)
-        IDLE: begin
-          state <= IDLE;
-          cycle_count <= 0;
-          rom_addr <= 0;
-          instruction_class <= 0;
-          size <= 0;
-          mode <= 0;
-          op <= 0;
-          src <= 0;
-          jt_offset_reg <= 0;
-          jf_offset_reg <= 0;
-          pc <= 0;
-          A <= 0;
-          X <= 0;
-          o_done <= 0;
-          o_pass_packet <= 0;
-          if (i_start) begin
-            pc <= 0;
-            state <= FETCH;
-          end
-        end
-
-        // Fetch instruction from ROM
-        FETCH: begin
-          if (cycle_count == ROM_LATENCY) begin
-            cycle_count <= 0;
-            state <= DECODE;
-          end else begin
-            rom_addr <= pc;
-            cycle_count <= cycle_count + 1;
-          end
-        end
-
-        // Parse retreived ROM data
-        DECODE: begin
-          mode <= rom_data[55:53];
-          size <= rom_data[52:51];
-
-          op <= rom_data[55:52];
-          src <= rom_data[51];
-
-          instruction_class <= rom_data[50:48];
-          jt_offset_reg <= rom_data[47:40];
-          jf_offset_reg <= rom_data[39:32];
-          immediate_reg <= rom_data[31:0];
-
-          // Reset cycle count for EXECUTE stage
-          cycle_count <= 0;
-          state <= EXECUTE;
-        end
-
-        EXECUTE: begin
-          case (instruction_class)
-            `BPF_RET: begin
-              // If we are executing a return instruction
-              // Reset all registers, set o_done to true and go to IDLE
-              pc <= 0;
-              A <= 0;
-              X <= 0;
-              o_done <= 1;
-              state <= IDLE;
-              o_pass_packet <= immediate_reg != 0;
-            end
-
-            `BPF_JMP: begin
-              // Conditional and unconditional jumps
-              if (op == `BPF_JA) begin
-                pc <= pc + immediate_reg;
-              end else if (op == `BPF_JEQ) begin
-                pc <= (A == immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
-              end else if (op == `BPF_JGT) begin
-                pc <= (A > immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
-              end else if (op == `BPF_JGE) begin
-                pc <= (A >= immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
-              end else if (op == `BPF_JSET) begin
-                pc <= ((A & immediate_reg) != 0) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
-              end else begin
-                pc <= pc + 1;
-              end
-              state <= FETCH;
-            end
+  // // rom interface and captured rom data
+  // logic [PC_WIDTH-1:0] rom_addr;
+  // logic [63:0] rom_data;
 
 
-            // Load instructions take multiple cycles
-            `BPF_LD: begin
-              if (mode == `BPF_IMM) begin
-                A <= immediate_reg;
-              end else if (mode == `BPF_ABS) begin
-                if (size == `BPF_BYTE) begin
-                  if (cycle_count == FIRST_BYTE) begin
-                    A <= i_ram_data;
-                    pc <= pc + 1;
-                    state <= FETCH;
-                    cycle_count <= 0;
-                  end else begin
-                    cycle_count <= cycle_count + 1;
-                  end
-                end else if (size == `BPF_HALFWORD) begin
-                  if (cycle_count == FIRST_BYTE) begin
-                    A <= i_ram_data;
-                    cycle_count <= cycle_count + 1;
-                  end else if (cycle_count == SECOND_BYTE) begin
-                    A <= {A[7:0], i_ram_data};
-                    pc <= pc + 1;
-                    state <= FETCH;
-                    cycle_count <= 0;
-                  end else begin
-                    cycle_count <= cycle_count + 1;
-                  end
-                end else if (size == `BPF_WORD) begin
-                  if (cycle_count == FIRST_BYTE) begin
-                    A <= i_ram_data;
-                    cycle_count <= cycle_count + 1;
-                  end else if (cycle_count == SECOND_BYTE) begin
-                    A <= {A[7:0], i_ram_data};
-                    cycle_count <= cycle_count + 1;
-                  end else if (cycle_count == THIRD_BYTE) begin
-                    A <= {A[15:0], i_ram_data};
-                    cycle_count <= cycle_count + 1;
-                  end else if (cycle_count == FOURTH_BYTE) begin
-                    A <= {A[23:0], i_ram_data};
-                    pc <= pc + 1;
-                    state <= FETCH;
-                    cycle_count <= 0;
-                  end else begin
-                    cycle_count <= cycle_count + 1;
-                  end
-                end else begin
-                  pc <= pc + 1;
-                  state <= FETCH;
-                end
-              end
-            end
+  // logic [4:0] cycle_count;
+  // localparam FIRST_BYTE = 3;
+  // localparam SECOND_BYTE = 6;
+  // localparam THIRD_BYTE = 9;
+  // localparam FOURTH_BYTE = 12;
 
-            default: begin
-              // unimplemented classes
-              pc <= pc + 1;
-              state <= FETCH;
-            end
-          endcase
-        end
-      endcase
-    end
-  end
+  // always_ff @(posedge clk) begin
+  //   if (rst) begin
+  //     state <= IDLE;
+  //     cycle_count <= 0;
+  //     rom_addr <= 0;
+  //     instruction_class <= 0;
+  //     size <= 0;
+  //     mode <= 0;
+  //     op <= 0;
+  //     src <= 0;
+  //     jt_offset_reg <= 0;
+  //     jf_offset_reg <= 0;
+  //     pc <= 0;
+  //     A <= 0;
+  //     X <= 0;
+  //     o_done <= 0;
+  //     o_pass_packet <= 0;
+  //   end else begin
+  //     case (state)
+  //       IDLE: begin
+  //         state <= IDLE;
+  //         cycle_count <= 0;
+  //         rom_addr <= 0;
+  //         instruction_class <= 0;
+  //         size <= 0;
+  //         mode <= 0;
+  //         op <= 0;
+  //         src <= 0;
+  //         jt_offset_reg <= 0;
+  //         jf_offset_reg <= 0;
+  //         pc <= 0;
+  //         A <= 0;
+  //         X <= 0;
+  //         o_done <= 0;
+  //         o_pass_packet <= 0;
+  //         if (i_start) begin
+  //           pc <= 0;
+  //           state <= FETCH;
+  //         end
+  //       end
+
+  //       // Fetch instruction from ROM
+  //       FETCH: begin
+  //         if (cycle_count == ROM_LATENCY) begin
+  //           cycle_count <= 0;
+  //           state <= DECODE;
+  //         end else begin
+  //           rom_addr <= pc;
+  //           cycle_count <= cycle_count + 1;
+  //         end
+  //       end
+
+  //       // Parse retreived ROM data
+  //       DECODE: begin
+  //         mode <= rom_data[55:53];
+  //         size <= rom_data[52:51];
+
+  //         op <= rom_data[55:52];
+  //         src <= rom_data[51];
+
+  //         instruction_class <= rom_data[50:48];
+  //         jt_offset_reg <= rom_data[47:40];
+  //         jf_offset_reg <= rom_data[39:32];
+  //         immediate_reg <= rom_data[31:0];
+
+  //         // Reset cycle count for EXECUTE stage
+  //         cycle_count <= 0;
+  //         state <= EXECUTE;
+  //       end
+
+  //       EXECUTE: begin
+  //         case (instruction_class)
+  //           `BPF_RET: begin
+  //             // If we are executing a return instruction
+  //             // Reset all registers, set o_done to true and go to IDLE
+  //             pc <= 0;
+  //             A <= 0;
+  //             X <= 0;
+  //             o_done <= 1;
+  //             state <= IDLE;
+  //             o_pass_packet <= immediate_reg != 0;
+  //           end
+
+  //           `BPF_JMP: begin
+  //             // Conditional and unconditional jumps
+  //             if (op == `BPF_JA) begin
+  //               pc <= pc + immediate_reg;
+  //             end else if (op == `BPF_JEQ) begin
+  //               pc <= (A == immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
+  //             end else if (op == `BPF_JGT) begin
+  //               pc <= (A > immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
+  //             end else if (op == `BPF_JGE) begin
+  //               pc <= (A >= immediate_reg) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
+  //             end else if (op == `BPF_JSET) begin
+  //               pc <= ((A & immediate_reg) != 0) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
+  //             end else begin
+  //               pc <= pc + 1;
+  //             end
+  //             state <= FETCH;
+  //           end
+
+
+  //           // Load instructions take multiple cycles
+  //           `BPF_LD: begin
+  //             if (mode == `BPF_IMM) begin
+  //               A <= immediate_reg;
+  //             end else if (mode == `BPF_ABS) begin
+  //               if (size == `BPF_BYTE) begin
+  //                 if (cycle_count == FIRST_BYTE) begin
+  //                   A <= i_ram_data;
+  //                   pc <= pc + 1;
+  //                   state <= FETCH;
+  //                   cycle_count <= 0;
+  //                 end else begin
+  //                   cycle_count <= cycle_count + 1;
+  //                 end
+  //               end else if (size == `BPF_HALFWORD) begin
+  //                 if (cycle_count == FIRST_BYTE) begin
+  //                   A <= i_ram_data;
+  //                   cycle_count <= cycle_count + 1;
+  //                 end else if (cycle_count == SECOND_BYTE) begin
+  //                   A <= {A[7:0], i_ram_data};
+  //                   pc <= pc + 1;
+  //                   state <= FETCH;
+  //                   cycle_count <= 0;
+  //                 end else begin
+  //                   cycle_count <= cycle_count + 1;
+  //                 end
+  //               end else if (size == `BPF_WORD) begin
+  //                 if (cycle_count == FIRST_BYTE) begin
+  //                   A <= i_ram_data;
+  //                   cycle_count <= cycle_count + 1;
+  //                 end else if (cycle_count == SECOND_BYTE) begin
+  //                   A <= {A[7:0], i_ram_data};
+  //                   cycle_count <= cycle_count + 1;
+  //                 end else if (cycle_count == THIRD_BYTE) begin
+  //                   A <= {A[15:0], i_ram_data};
+  //                   cycle_count <= cycle_count + 1;
+  //                 end else if (cycle_count == FOURTH_BYTE) begin
+  //                   A <= {A[23:0], i_ram_data};
+  //                   pc <= pc + 1;
+  //                   state <= FETCH;
+  //                   cycle_count <= 0;
+  //                 end else begin
+  //                   cycle_count <= cycle_count + 1;
+  //                 end
+  //               end else begin
+  //                 pc <= pc + 1;
+  //                 state <= FETCH;
+  //               end
+  //             end
+  //           end
+
+  //           default: begin
+  //             // unimplemented classes
+  //             pc <= pc + 1;
+  //             state <= FETCH;
+  //           end
+  //         endcase
+  //       end
+  //     endcase
+  //   end
+  // end
 
 
 
-  //=========================================================================
-  // Data path
-  //=========================================================================
+  // //=========================================================================
+  // // Data path
+  // //=========================================================================
 
-  logic [BUF_ADDR_BITS-1:0] base_addr;
-  always_comb begin
-    o_ram_rd_en = 1'b0;
-    o_ram_addr  = '0;
-    if (state == EXECUTE && instruction_class == `BPF_LD && mode == `BPF_ABS) begin
-      // address includes +2 offset because of preamble
-      base_addr = immediate_reg;
-      if (size == `BPF_BYTE) begin
-        if (cycle_count == 0) begin
-          o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr;
-        end
-      end else if (size == `BPF_HALFWORD) begin
-        if (cycle_count == 0) begin
-          o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr;
-        end else if (cycle_count == FIRST_BYTE) begin
-          o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 1;
-        end
-      end else if (size == `BPF_WORD) begin
-        if (cycle_count == 0) begin
-          o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr;
-        end else if (cycle_count == FIRST_BYTE) begin
-          o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 1;
-        end else if (cycle_count == SECOND_BYTE) begin
-          o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 2;
-        end else if (cycle_count == THIRD_BYTE) begin
-          o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 3;
-        end
-      end
-    end
-  end
+  // logic [BUF_ADDR_BITS-1:0] base_addr;
+  // always_comb begin
+  //   o_ram_rd_en = 1'b0;
+  //   o_ram_addr  = '0;
+  //   if (state == EXECUTE && instruction_class == `BPF_LD && mode == `BPF_ABS) begin
+  //     // address includes +2 offset because of preamble
+  //     base_addr = immediate_reg;
+  //     if (size == `BPF_BYTE) begin
+  //       if (cycle_count == 0) begin
+  //         o_ram_rd_en = 1'b1;
+  //         o_ram_addr  = base_addr;
+  //       end
+  //     end else if (size == `BPF_HALFWORD) begin
+  //       if (cycle_count == 0) begin
+  //         o_ram_rd_en = 1'b1;
+  //         o_ram_addr  = base_addr;
+  //       end else if (cycle_count == FIRST_BYTE) begin
+  //         o_ram_rd_en = 1'b1;
+  //         o_ram_addr  = base_addr + 1;
+  //       end
+  //     end else if (size == `BPF_WORD) begin
+  //       if (cycle_count == 0) begin
+  //         o_ram_rd_en = 1'b1;
+  //         o_ram_addr  = base_addr;
+  //       end else if (cycle_count == FIRST_BYTE) begin
+  //         o_ram_rd_en = 1'b1;
+  //         o_ram_addr  = base_addr + 1;
+  //       end else if (cycle_count == SECOND_BYTE) begin
+  //         o_ram_rd_en = 1'b1;
+  //         o_ram_addr  = base_addr + 2;
+  //       end else if (cycle_count == THIRD_BYTE) begin
+  //         o_ram_rd_en = 1'b1;
+  //         o_ram_addr  = base_addr + 3;
+  //       end
+  //     end
+  //   end
+  // end
 
 
-  //=========================================================================
-  // Submodules
-  //=========================================================================
-  xilinx_single_port_ram_read_first #(
-      .RAM_WIDTH(64),
-      .RAM_DEPTH(256),
-      .RAM_PERFORMANCE("HIGH_PERFORMANCE"),
-      .INIT_FILE(`FPATH(ip_and_udp.mem))
-  ) instr_rom (
-      .addra(rom_addr),
-      .dina(64'b0),
-      .clka(clk),
-      .wea(1'b0),
-      .ena(1'b1),
-      .rsta(rst),
-      .regcea(1'b1),
-      .douta(rom_data)
-  );
+  // //=========================================================================
+  // // Submodules
+  // //=========================================================================
+  // xilinx_single_port_ram_read_first #(
+  //     .RAM_WIDTH(64),
+  //     .RAM_DEPTH(256),
+  //     .RAM_PERFORMANCE("HIGH_PERFORMANCE"),
+  //     .INIT_FILE(`FPATH(ip_and_udp.mem))
+  // ) instr_rom (
+  //     .addra(rom_addr),
+  //     .dina(64'b0),
+  //     .clka(clk),
+  //     .wea(1'b0),
+  //     .ena(1'b1),
+  //     .rsta(rst),
+  //     .regcea(1'b1),
+  //     .douta(rom_data)
+  // );
 
 
 endmodule
+`default_nettype wire

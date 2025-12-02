@@ -74,38 +74,38 @@ module network_bpf #(
   // ------------------------------------------------------------------------
   // RX Write Ports
   logic         [NUM_CPUS-1:0]                     rx_wr_en;
-  logic         [NUM_CPUS-1:0][BRAM_ADDR_BITS-1:0] rx_wr_addr;
+  logic         [NUM_CPUS-1:0][BRAM_ADDR_BITS-1:0] rx_bram_addr;
   logic         [NUM_CPUS-1:0][    BRAM_WIDTH-1:0] rx_wr_data;
-  logic         [NUM_CPUS-1:0][   BUF_ID_BITS-1:0] rx_buf_id_out;
-  logic         [NUM_CPUS-1:0][ BUF_ADDR_BITS-1:0] rx_wr_addr_out;
+  logic         [NUM_CPUS-1:0][   BUF_ID_BITS-1:0] rx_buf_id;
+  logic         [NUM_CPUS-1:0][ BUF_ADDR_BITS-1:0] rx_buf_addr;
   genvar i;
   generate
     for (i = 0; i < NUM_CPUS; i++) begin : rx_addr_gen
-      assign rx_wr_addr[i] = {rx_buf_id_out[i], rx_wr_addr_out[i]};
+      assign rx_bram_addr[i] = {rx_buf_id[i], rx_buf_addr[i]};
     end
   endgenerate
 
   // BPF Read Port
   logic [NUM_CPUS-1:0]                     bpf_rd_en;
-  logic [NUM_CPUS-1:0][BRAM_ADDR_BITS-1:0] bpf_rd_addr;
+  logic [NUM_CPUS-1:0][BRAM_ADDR_BITS-1:0] bpf_bram_addr;
   logic [NUM_CPUS-1:0][    BRAM_WIDTH-1:0] bpf_rd_data;
-  logic [NUM_CPUS-1:0][   BUF_ID_BITS-1:0] bpf_buf_id_out;
-  logic [NUM_CPUS-1:0][ BUF_ADDR_BITS-1:0] bpf_rd_addr_out;
+  logic [NUM_CPUS-1:0][   BUF_ID_BITS-1:0] bpf_buf_id;
+  logic [NUM_CPUS-1:0][ BUF_ADDR_BITS-1:0] bpf_buf_addr;
   generate
     for (i = 0; i < NUM_CPUS; i++) begin : bpf_addr_gen
-      assign bpf_rd_addr[i] = {bpf_buf_id_out[i], bpf_rd_addr_out[i]};
+      assign bpf_bram_addr[i] = {bpf_buf_id[i], bpf_buf_addr[i]};
     end
   endgenerate
 
   // TX Read Port
   logic [NUM_CPUS-1:0]                     tx_rd_en;
-  logic [NUM_CPUS-1:0][BRAM_ADDR_BITS-1:0] tx_rd_addr;
+  logic [NUM_CPUS-1:0][BRAM_ADDR_BITS-1:0] tx_bram_addr;
   logic [NUM_CPUS-1:0][    BRAM_WIDTH-1:0] tx_rd_data;
-  logic [NUM_CPUS-1:0][   BUF_ID_BITS-1:0] tx_buf_id_out;
-  logic [NUM_CPUS-1:0][ BUF_ADDR_BITS-1:0] tx_rd_addr_out;
+  logic [NUM_CPUS-1:0][   BUF_ID_BITS-1:0] tx_buf_id;
+  logic [NUM_CPUS-1:0][ BUF_ADDR_BITS-1:0] tx_buf_addr;
   generate
     for (i = 0; i < NUM_CPUS; i++) begin : tx_addr_gen
-      assign tx_rd_addr[i] = {tx_buf_id_out[i], tx_rd_addr_out[i]};
+      assign tx_bram_addr[i] = {tx_buf_id[i], tx_buf_addr[i]};
     end
   endgenerate
 
@@ -125,16 +125,15 @@ module network_bpf #(
   // ========================================================================
 
   // 1. Free Buffer Mux (Many CPUs -> 1 RX)
-  logic [CPU_ID_BITS-1:0] rx_free_buf_cpu_id;
-  logic [BUF_ID_BITS-1:0] rx_free_buf_id;
-  logic                   rx_free_buf_mux_valid;
-  logic                   rx_free_buf_mux_ready;
+  logic [CPU_ID_BITS-1:0] rx_mux_free_buf_pop_cpu_id;
+  logic [BUF_ID_BITS-1:0] rx_mux_free_buf_pop_data;
+  logic                   rx_mux_free_buf_pop_valid;
+  logic                   rx_mux_free_buf_pop_ready;
 
   mux #(
       .NUM_CPUS(NUM_CPUS),
       .CPU_ID_BITS(CPU_ID_BITS),
-      .NUM_BUFFERS_PER_CPU(NUM_BUFFERS_PER_CPU),
-      .BUF_ID_BITS(BUF_ID_BITS)
+      .DATA_WIDTH(BUF_ID_BITS)
   ) rx_mux (
       .clk(eth1_clk),
       .rst(rst),
@@ -143,65 +142,63 @@ module network_bpf #(
       .i_pop_valid(free_buf_pop_valid),
       .o_pop_ready(free_buf_pop_ready),
       // Single Output to eth_rx
-      .o_mux_cpu_id(rx_free_buf_cpu_id),
-      .o_mux_data(rx_free_buf_id),
-      .o_mux_valid(rx_free_buf_mux_valid),
-      .i_mux_ready(rx_free_buf_mux_ready)
+      .o_mux_pop_cpu_id(rx_mux_free_buf_pop_cpu_id),
+      .o_mux_pop_data(rx_mux_free_buf_pop_data),
+      .o_mux_pop_valid(rx_mux_free_buf_pop_valid),
+      .i_mux_pop_ready(rx_mux_free_buf_pop_ready)
   );
 
   // 2. BPF Work Demux (1 RX -> Many CPUs)
-  logic         [CPU_ID_BITS-1:0] rx_bpf_work_cpu_id;
-  packet_desc_t                   rx_bpf_work_desc;
-  logic                           rx_bpf_work_push_valid;
-  logic                           rx_bpf_work_push_ready;
+  logic         [CPU_ID_BITS-1:0] rx_demux_bpf_work_push_cpu_id;
+  packet_desc_t                   rx_demux_bpf_work_push_data;
+  logic                           rx_demux_bpf_work_push_valid;
+  logic                           rx_demux_bpf_work_push_ready;
 
   demux #(
       .NUM_CPUS(NUM_CPUS),
       .CPU_ID_BITS(CPU_ID_BITS),
-      .NUM_BUFFERS_PER_CPU(NUM_BUFFERS_PER_CPU),
-      .BUF_ID_BITS(BUF_ID_BITS),
       .DATA_WIDTH($bits(packet_desc_t))
   ) rx_demux (
-      .clk                (eth1_clk),
-      .rst                (rst),
+      .clk               (eth1_clk),
+      .rst               (rst),
       // Single Input from eth_rx
-      .i_demux_cpu_id     (rx_bpf_work_cpu_id),
-      .i_demux_data       (rx_bpf_work_desc),
-      .i_demux_push_valid (rx_bpf_work_push_valid),
-      .o_demux_push_ready (rx_bpf_work_push_ready),
+      .i_demux_cpu_id    (rx_demux_bpf_work_push_cpu_id),
+      .i_demux_push_data (rx_demux_bpf_work_push_data),
+      .i_demux_push_valid(rx_demux_bpf_work_push_valid),
+      .o_demux_push_ready(rx_demux_bpf_work_push_ready),
       // Array Outputs
-      .o_push_data        (bpf_work_push_data),
-      .o_push_valid       (bpf_work_push_valid),
-      .i_push_ready       (bpf_work_push_ready)
+      .o_push_data       (bpf_work_push_data),
+      .o_push_valid      (bpf_work_push_valid),
+      .i_push_ready      (bpf_work_push_ready)
   );
 
   // 3. BRAM Write Demux (1 RX -> Many BRAMs)
-  logic                     rx_bram_wr_en;
-  logic [  CPU_ID_BITS-1:0] rx_bram_cpu_id;
-  logic [  BUF_ID_BITS-1:0] rx_bram_buf_id;
-  logic [BUF_ADDR_BITS-1:0] rx_bram_wr_addr;
-  logic [              7:0] rx_bram_wr_data;
+  logic                     rx_demux_bram_wr_en;
+  logic [  CPU_ID_BITS-1:0] rx_demux_bram_cpu_id;
+  logic [  BUF_ID_BITS-1:0] rx_demux_bram_buf_id;
+  logic [BUF_ADDR_BITS-1:0] rx_demux_bram_wr_addr;
+  logic [              7:0] rx_demux_bram_wr_data;
 
-  bram_demux #(
+  bram_demux_write #(
       .NUM_CPUS(NUM_CPUS),
       .CPU_ID_BITS(CPU_ID_BITS),
-      .NUM_BUFFERS_PER_CPU(NUM_BUFFERS_PER_CPU),
       .BUF_ID_BITS(BUF_ID_BITS),
+      .BUF_ADDR_BITS(BUF_ADDR_BITS),
       .DATA_WIDTH(8)
   ) rx_bram_demux (
       .clk           (eth1_clk),
       .rst           (rst),
       // Single Input from eth_rx
-      .i_demux_wr_en (rx_bram_wr_en),
-      .i_demux_cpu_id(rx_bram_cpu_id),
-      .i_demux_buf_id(rx_bram_buf_id),
-      .i_demux_addr  (rx_bram_wr_addr),
-      .i_demux_data  (rx_bram_wr_data),
+      .i_demux_cpu_id(rx_demux_bram_cpu_id),
+      .i_demux_wr_en (rx_demux_bram_wr_en),
+      .i_demux_buf_id(rx_demux_bram_buf_id),
+      .i_demux_addr  (rx_demux_bram_wr_addr),
+      .i_demux_data  (rx_demux_bram_wr_data),
       // Array Outputs
-      .o_wr_en       (rx_wr_en),
-      .o_wr_data     (rx_wr_data),
-      .o_buf_id_out  (rx_buf_id_out),
-      .o_addr_out    (rx_wr_addr_out)
+      .o_wr_en      (rx_wr_en),
+      .o_wr_data    (rx_wr_data),
+      .o_buf_id_out (rx_buf_id),
+      .o_addr_out   (rx_buf_addr)
   );
 
   // 4. RX Module Instantiation
@@ -217,23 +214,23 @@ module network_bpf #(
       .eth_rxd  (eth1_rxd),
 
       // Free Buffer Interface (Muxed)
-      .i_free_buf_pop_cpu_id(rx_free_buf_cpu_id),
-      .i_free_buf_pop_data  (rx_free_buf_id),
-      .i_free_buf_pop_valid (rx_free_buf_mux_valid),
-      .o_free_buf_pop_ready (rx_free_buf_mux_ready),
+      .i_free_buf_pop_cpu_id(rx_mux_free_buf_pop_cpu_id),
+      .i_free_buf_pop_data  (rx_mux_free_buf_pop_data),
+      .i_free_buf_pop_valid (rx_mux_free_buf_pop_valid),
+      .o_free_buf_pop_ready (rx_mux_free_buf_pop_ready),
 
       // Work Push Interface (Demuxed)
-      .o_bpf_work_push_cpu_id(rx_bpf_work_cpu_id),
-      .o_bpf_work_push_data  (rx_bpf_work_desc),
-      .o_bpf_work_push_valid (rx_bpf_work_push_valid),
-      .i_bpf_work_push_ready (rx_bpf_work_push_ready),
+      .o_bpf_work_push_cpu_id(rx_demux_bpf_work_push_cpu_id),
+      .o_bpf_work_push_data  (rx_demux_bpf_work_push_data),
+      .o_bpf_work_push_valid (rx_demux_bpf_work_push_valid),
+      .i_bpf_work_push_ready (rx_demux_bpf_work_push_ready),
 
       // BRAM Write Interface (Demuxed)
-      .o_wren   (rx_bram_wr_en),
-      .o_cpu_id (rx_bram_cpu_id),
-      .o_buf_id (rx_bram_buf_id),
-      .o_wr_addr(rx_bram_wr_addr),
-      .o_wr_data(rx_bram_wr_data),
+      .o_wren   (rx_demux_bram_wr_en),
+      .o_cpu_id (rx_demux_bram_cpu_id),
+      .o_buf_id (rx_demux_bram_buf_id),
+      .o_wr_addr(rx_demux_bram_wr_addr),
+      .o_wr_data(rx_demux_bram_wr_data),
 
       // Stats
       .o_byte_active       (pkt_ingress_byte_active),
@@ -247,16 +244,14 @@ module network_bpf #(
   // ========================================================================
 
   // 1. TX Work Mux/Arbiter (Many CPUs -> 1 TX)
-  logic         [CPU_ID_BITS-1:0] tx_work_cpu_id;
-  packet_desc_t                   tx_work_desc;
-  logic                           tx_work_mux_valid;
-  logic                           tx_work_mux_ready;
+  logic         [CPU_ID_BITS-1:0] tx_mux_tx_work_pop_cpu_id;
+  packet_desc_t                   tx_mux_tx_work_pop_data;
+  logic                           tx_mux_tx_work_pop_valid;
+  logic                           tx_mux_tx_work_pop_ready;
 
   mux #(
       .NUM_CPUS(NUM_CPUS),
       .CPU_ID_BITS(CPU_ID_BITS),
-      .NUM_BUFFERS_PER_CPU(NUM_BUFFERS_PER_CPU),
-      .BUF_ID_BITS(BUF_ID_BITS),
       .DATA_WIDTH($bits(packet_desc_t))
   ) tx_work_mux (
       .clk(eth2_clk),
@@ -266,66 +261,64 @@ module network_bpf #(
       .i_pop_valid(tx_work_pop_valid),
       .o_pop_ready(tx_work_pop_ready),
       // Single Output to eth_tx
-      .o_mux_cpu_id(tx_work_cpu_id),
-      .o_mux_data(tx_work_desc),
-      .o_mux_valid(tx_work_mux_valid),
-      .i_mux_ready(tx_work_mux_ready)
+      .o_mux_pop_cpu_id(tx_mux_tx_work_pop_cpu_id),
+      .o_mux_pop_data(tx_mux_tx_work_pop_data),
+      .o_mux_pop_valid(tx_mux_tx_work_pop_valid),
+      .i_mux_pop_ready(tx_mux_tx_work_pop_ready)
   );
 
   // 2. Return Buffer Demux (1 TX -> Many Free Lists)
-  logic [CPU_ID_BITS-1:0] tx_ret_cpu_id;
-  logic [BUF_ID_BITS-1:0] tx_ret_buf_id;
-  logic                   tx_ret_push_valid;
-  logic                   tx_ret_push_ready;
+  logic [CPU_ID_BITS-1:0] tx_demux_free_buf_push_cpu_id;
+  logic [BUF_ID_BITS-1:0] tx_demux_free_buf_push_data;
+  logic                   tx_demux_free_buf_push_valid;
+  logic                   tx_demux_free_buf_push_ready;
 
   demux #(
       .NUM_CPUS(NUM_CPUS),
       .CPU_ID_BITS(CPU_ID_BITS),
-      .NUM_BUFFERS_PER_CPU(NUM_BUFFERS_PER_CPU),
-      .BUF_ID_BITS(BUF_ID_BITS),
       .DATA_WIDTH(BUF_ID_BITS)
   ) tx_ret_demux (
-      .clk                (eth2_clk),
-      .rst                (rst),
+      .clk               (eth2_clk),
+      .rst               (rst),
       // Single Input from eth_tx
-      .i_demux_cpu_id     (tx_ret_cpu_id),
-      .i_demux_data       (tx_ret_buf_id),
-      .i_demux_push_valid (tx_ret_push_valid),
-      .o_demux_push_ready (tx_ret_push_ready),
+      .i_demux_cpu_id    (tx_demux_free_buf_push_cpu_id),
+      .i_demux_push_data (tx_demux_free_buf_push_data),
+      .i_demux_push_valid(tx_demux_free_buf_push_valid),
+      .o_demux_push_ready(tx_demux_free_buf_push_ready),
       // Array Outputs (pushing back to free list)
-      .o_push_data        (free_buf_push_data),
-      .o_push_valid       (free_buf_push_valid),
-      .i_push_ready       (free_buf_push_ready)
+      .o_push_data       (free_buf_push_data),
+      .o_push_valid      (free_buf_push_valid),
+      .i_push_ready      (free_buf_push_ready)
   );
 
   // 3. BRAM Read Mux (1 TX Reads -> Many BRAMs)
-  logic                     tx_bram_rd_en;
-  logic [  CPU_ID_BITS-1:0] tx_bram_cpu_id;
-  logic [  BUF_ID_BITS-1:0] tx_bram_buf_id;
-  logic [BUF_ADDR_BITS-1:0] tx_bram_rd_addr;
-  logic [              7:0] tx_bram_rd_data_muxed;
+  logic                     tx_mux_bram_rd_en;
+  logic [  CPU_ID_BITS-1:0] tx_mux_bram_cpu_id;
+  logic [  BUF_ID_BITS-1:0] tx_mux_bram_buf_id;
+  logic [BUF_ADDR_BITS-1:0] tx_mux_bram_rd_addr;
+  logic [              7:0] tx_mux_bram_rd_data;
 
-  bram_mux #(
+  bram_demux_read #(
       .NUM_CPUS(NUM_CPUS),
       .CPU_ID_BITS(CPU_ID_BITS),
-      .NUM_BUFFERS_PER_CPU(NUM_BUFFERS_PER_CPU),
       .BUF_ID_BITS(BUF_ID_BITS),
+      .BUF_ADDR_BITS(BUF_ADDR_BITS),
       .DATA_WIDTH(8)
   ) tx_bram_mux (
       .clk         (eth2_clk),
       .rst         (rst),
       // Single Input from eth_tx (Control)
-      .i_mux_rd_en (tx_bram_rd_en),
-      .i_mux_cpu_id(tx_bram_cpu_id),
-      .i_mux_buf_id(tx_bram_buf_id),
-      .i_mux_addr  (tx_bram_rd_addr),
+      .i_mux_rd_en (tx_mux_bram_rd_en),
+      .i_mux_cpu_id(tx_mux_bram_cpu_id),
+      .i_mux_buf_id(tx_mux_bram_buf_id),
+      .i_mux_addr  (tx_mux_bram_rd_addr),
       // Array Connections (Control Out, Data In)
       .o_rd_en     (tx_rd_en),
-      .o_buf_id_out(tx_buf_id_out),
-      .o_addr_out  (tx_rd_addr_out),
+      .o_buf_id_out(tx_buf_id),
+      .o_addr_out  (tx_buf_addr),
       .i_rd_data   (tx_rd_data),
       // Single Output to eth_tx (Data)
-      .o_mux_data  (tx_bram_rd_data_muxed)
+      .o_mux_data  (tx_mux_bram_rd_data)
   );
 
   // 4. TX Module Instantiation
@@ -340,23 +333,23 @@ module network_bpf #(
       .eth_txd(eth2_txd),
 
       // Work Pull Interface (Muxed)
-      .i_tx_work_pop_cpu_id(tx_work_cpu_id),
-      .i_tx_work_pop_data  (tx_work_desc),
-      .i_tx_work_pop_valid (tx_work_mux_valid),
-      .o_tx_work_pop_ready (tx_work_mux_ready),
+      .i_tx_work_pop_cpu_id(tx_mux_tx_work_pop_cpu_id),
+      .i_tx_work_pop_data  (tx_mux_tx_work_pop_data),
+      .i_tx_work_pop_valid (tx_mux_tx_work_pop_valid),
+      .o_tx_work_pop_ready (tx_mux_tx_work_pop_ready),
 
       // Return Buffer Interface (Demuxed)
-      .o_free_buf_push_cpu_id(tx_ret_cpu_id),
-      .o_free_buf_push_data  (tx_ret_buf_id),
-      .o_free_buf_push_valid (tx_ret_push_valid),
-      .i_free_buf_push_ready (tx_ret_push_ready),
+      .o_free_buf_push_cpu_id(tx_demux_free_buf_push_cpu_id),
+      .o_free_buf_push_data  (tx_demux_free_buf_push_data),
+      .o_free_buf_push_valid (tx_demux_free_buf_push_valid),
+      .i_free_buf_push_ready (tx_demux_free_buf_push_ready),
 
       // BRAM Read Interface (Muxed)
-      .o_rd_en  (tx_bram_rd_en),
-      .o_cpu_id (tx_bram_cpu_id),
-      .o_buf_id (tx_bram_buf_id),
-      .o_rd_addr(tx_bram_rd_addr),
-      .i_rd_data(tx_bram_rd_data_muxed),
+      .o_rd_en  (tx_mux_bram_rd_en),
+      .o_cpu_id (tx_mux_bram_cpu_id),
+      .o_buf_id (tx_mux_bram_buf_id),
+      .o_rd_addr(tx_mux_bram_rd_addr),
+      .i_rd_data(tx_mux_bram_rd_data),
 
       // Stats
       .o_byte_active       (pkt_egress_byte_active),
@@ -376,7 +369,7 @@ module network_bpf #(
           .FIFO_DEPTH(FIFO_DEPTH),
           .INIT_COUNT(NUM_BUFFERS_PER_CPU)
       ) free_buf_fifo (
-          .rst(rst),
+          .rst         (rst),
           // Push from ETH2 (Return from TX)
           .push_clk    (eth2_clk),
           .i_push_data (free_buf_push_data[i]),
@@ -397,13 +390,13 @@ module network_bpf #(
           .clk(eth1_clk),
           .rst(rst),
           // Push from ETH1 (RX)
-          .i_push_data (bpf_work_push_data[i]),
+          .i_push_data(bpf_work_push_data[i]),
           .i_push_valid(bpf_work_push_valid[i]),
           .o_push_ready(bpf_work_push_ready[i]),
           // Pop to Processor
-          .o_pop_data  (bpf_work_pop_data[i]),
-          .o_pop_valid (bpf_work_pop_valid[i]),
-          .i_pop_ready (bpf_work_pop_ready[i])
+          .o_pop_data(bpf_work_pop_data[i]),
+          .o_pop_valid(bpf_work_pop_valid[i]),
+          .i_pop_ready(bpf_work_pop_ready[i])
       );
 
       // --- TX Work FIFO ---
@@ -411,7 +404,7 @@ module network_bpf #(
           .DATA_WIDTH($bits(packet_desc_t)),
           .FIFO_DEPTH(FIFO_DEPTH)
       ) tx_work_fifo (
-          .rst(rst),
+          .rst         (rst),
           // Push from Processor
           .push_clk    (eth1_clk),
           .i_push_data (tx_work_push_data[i]),
@@ -430,14 +423,14 @@ module network_bpf #(
           .RAM_DEPTH(BRAM_DEPTH)
       ) bpf_packet_bram (
           .clka(eth1_clk),
-          .addra(rx_wr_addr[i]),
+          .addra(rx_bram_addr[i]),
           .dina(rx_wr_data[i]),
           .wea(rx_wr_en[i]),
           .ena(1'b1),
           .regcea(1'b1),
           .rsta(rst),
           .douta(),  // RX only writes
-          .addrb(bpf_rd_addr[i]),
+          .addrb(bpf_bram_addr[i]),
           .dinb(0),
           .web(1'b0),
           .enb(1'b1),
@@ -451,7 +444,7 @@ module network_bpf #(
           .RAM_DEPTH(BRAM_DEPTH)
       ) tx_bram (
           .clka(eth1_clk),
-          .addra(rx_wr_addr[i]),
+          .addra(rx_bram_addr[i]),
           .dina(rx_wr_data[i]),
           .wea(rx_wr_en[i]),
           .ena(1'b1),
@@ -459,7 +452,7 @@ module network_bpf #(
           .rsta(rst),
           .douta(),  // RX only writes
           .clkb(eth2_clk),
-          .addrb(tx_rd_addr[i]),
+          .addrb(tx_bram_addr[i]),
           .dinb(0),
           .web(1'b0),
           .enb(1'b1),
@@ -485,8 +478,8 @@ module network_bpf #(
           .i_tx_work_push_ready(tx_work_push_ready[i]),
 
           .o_rd_en  (bpf_rd_en[i]),
-          .o_buf_id (bpf_buf_id_out[i]),
-          .o_rd_addr(bpf_rd_addr_out[i]),
+          .o_buf_id (bpf_buf_id[i]),
+          .o_rd_addr(bpf_buf_addr[i]),
           .i_rd_data(bpf_rd_data[i]),
 
           .o_pkt_bpf_dropped_pulse()
@@ -504,11 +497,11 @@ module network_bpf #(
       .clk(eth1_clk),
       .rst(rst),
       .i_byte_active(pkt_ingress_byte_active),
-      .i_pkt_recieved(pkt_ingress_received_pulse),
+      .i_pkt_received(pkt_ingress_received_pulse),
       .i_pkt_sent(pkt_ingress_sent_pulse),
 
       .o_total_bytes(ingress_total_bytes),
-      .o_recieved_packets(ingress_received_packets),
+      .o_received_packets(ingress_received_packets),
       .o_sent_packets(ingress_sent_packets)
   );
 
@@ -516,11 +509,11 @@ module network_bpf #(
       .clk(eth2_clk),
       .rst(rst),
       .i_byte_active(pkt_egress_byte_active),
-      .i_pkt_recieved(pkt_egress_received_pulse),
+      .i_pkt_received(pkt_egress_received_pulse),
       .i_pkt_sent(pkt_egress_sent_pulse),
 
       .o_total_bytes(egress_total_bytes),
-      .o_recieved_packets(egress_received_packets),
+      .o_received_packets(egress_received_packets),
       .o_sent_packets(egress_sent_packets)
   );
 
