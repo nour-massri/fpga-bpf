@@ -1,10 +1,8 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_desc_t.svh"
 
-module bpf_processor #(
-    parameter int BUF_ID_BITS   = 2,
-    parameter int BUF_ADDR_BITS = 11
-) (
+module bpf_processor
+  import network_bpf_config_pkg::*;
+(
     input wire clk,
     input wire rst,
 
@@ -57,8 +55,7 @@ module bpf_processor #(
   //=========================================================================
 
   bpf_cpu #(
-      .PC_WIDTH(8),
-      .BUF_ADDR_BITS(BUF_ADDR_BITS)
+      .PC_WIDTH(8)
   ) cpu_inst (
       .clk(clk),
       .rst(rst),

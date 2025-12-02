@@ -1,11 +1,8 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_desc_t.svh"
 
-module network_bpf #(
-    parameter int NUM_CPUS            = 4,
-    parameter int NUM_BUFFERS_PER_CPU = 16,
-    parameter int BUFFER_SIZE         = 1024
-) (
+module network_bpf
+  import network_bpf_config_pkg::*;
+(
     input wire rst,
 
     // Port 1 (Ingress)
@@ -29,20 +26,7 @@ module network_bpf #(
 );
 
   // ------------------------------------------------------------------------
-  // Derived Parameters 
-  // ------------------------------------------------------------------------
-  localparam int CPU_ID_BITS = $clog2(NUM_CPUS);
-  localparam int BUF_ID_BITS = $clog2(NUM_BUFFERS_PER_CPU);
-  localparam int BUF_ADDR_BITS = $clog2(BUFFER_SIZE);
-
-  localparam int BRAM_ADDR_BITS = BUF_ID_BITS + BUF_ADDR_BITS;
-  localparam int BRAM_DEPTH = NUM_BUFFERS_PER_CPU * BUFFER_SIZE;
-  localparam int BRAM_WIDTH = 8;  // 1 byte
-
-  localparam int FIFO_DEPTH = 2 * NUM_BUFFERS_PER_CPU;
-
-  // ------------------------------------------------------------------------
-  // Internal FIFO Interfaces (Arrays connected to CPUs)
+  // Internal FIFO Interfaces 
   // ------------------------------------------------------------------------
 
   // --- 1. Free Buffer FIFO (buffer IDs) ---
@@ -70,7 +54,7 @@ module network_bpf #(
   logic         [NUM_CPUS-1:0]                     tx_work_pop_ready;
 
   // ------------------------------------------------------------------------
-  // BRAM Interface Signals (Arrays connected to BRAMs)
+  // BRAM Interface Signals 
   // ------------------------------------------------------------------------
   // RX Write Ports
   logic         [NUM_CPUS-1:0]                     rx_wr_en;
@@ -121,7 +105,7 @@ module network_bpf #(
   logic                   pkt_egress_sent_pulse;
 
   // ========================================================================
-  // RX SIDE (Ingress) - Definitions, Interconnect, and Instantiation
+  // RX SIDE (Ingress)
   // ========================================================================
 
   // 1. Free Buffer Mux (Many CPUs -> 1 RX)
@@ -131,8 +115,6 @@ module network_bpf #(
   logic                   rx_mux_free_buf_pop_ready;
 
   mux #(
-      .NUM_CPUS(NUM_CPUS),
-      .CPU_ID_BITS(CPU_ID_BITS),
       .DATA_WIDTH(BUF_ID_BITS)
   ) rx_mux (
       .clk(eth1_clk),
@@ -155,8 +137,6 @@ module network_bpf #(
   logic                           rx_demux_bpf_work_push_ready;
 
   demux #(
-      .NUM_CPUS(NUM_CPUS),
-      .CPU_ID_BITS(CPU_ID_BITS),
       .DATA_WIDTH($bits(packet_desc_t))
   ) rx_demux (
       .clk               (eth1_clk),
@@ -180,10 +160,6 @@ module network_bpf #(
   logic [              7:0] rx_demux_bram_wr_data;
 
   bram_demux_write #(
-      .NUM_CPUS(NUM_CPUS),
-      .CPU_ID_BITS(CPU_ID_BITS),
-      .BUF_ID_BITS(BUF_ID_BITS),
-      .BUF_ADDR_BITS(BUF_ADDR_BITS),
       .DATA_WIDTH(8)
   ) rx_bram_demux (
       .clk           (eth1_clk),
@@ -195,18 +171,14 @@ module network_bpf #(
       .i_demux_addr  (rx_demux_bram_wr_addr),
       .i_demux_data  (rx_demux_bram_wr_data),
       // Array Outputs
-      .o_wr_en      (rx_wr_en),
-      .o_wr_data    (rx_wr_data),
-      .o_buf_id_out (rx_buf_id),
-      .o_addr_out   (rx_buf_addr)
+      .o_wr_en       (rx_wr_en),
+      .o_wr_data     (rx_wr_data),
+      .o_buf_id_out  (rx_buf_id),
+      .o_addr_out    (rx_buf_addr)
   );
 
   // 4. RX Module Instantiation
-  eth_rx #(
-      .CPU_ID_BITS  (CPU_ID_BITS),
-      .BUF_ID_BITS  (BUF_ID_BITS),
-      .BUF_ADDR_BITS(BUF_ADDR_BITS)
-  ) eth_rx_inst (
+  eth_rx eth_rx_inst (
       .clk(eth1_clk),
       .rst(rst),
 
@@ -240,7 +212,7 @@ module network_bpf #(
 
 
   // ========================================================================
-  // TX SIDE (Egress) - Definitions, Interconnect, and Instantiation
+  // TX SIDE (Egress)
   // ========================================================================
 
   // 1. TX Work Mux/Arbiter (Many CPUs -> 1 TX)
@@ -250,8 +222,6 @@ module network_bpf #(
   logic                           tx_mux_tx_work_pop_ready;
 
   mux #(
-      .NUM_CPUS(NUM_CPUS),
-      .CPU_ID_BITS(CPU_ID_BITS),
       .DATA_WIDTH($bits(packet_desc_t))
   ) tx_work_mux (
       .clk(eth2_clk),
@@ -274,8 +244,6 @@ module network_bpf #(
   logic                   tx_demux_free_buf_push_ready;
 
   demux #(
-      .NUM_CPUS(NUM_CPUS),
-      .CPU_ID_BITS(CPU_ID_BITS),
       .DATA_WIDTH(BUF_ID_BITS)
   ) tx_ret_demux (
       .clk               (eth2_clk),
@@ -299,10 +267,6 @@ module network_bpf #(
   logic [              7:0] tx_mux_bram_rd_data;
 
   bram_demux_read #(
-      .NUM_CPUS(NUM_CPUS),
-      .CPU_ID_BITS(CPU_ID_BITS),
-      .BUF_ID_BITS(BUF_ID_BITS),
-      .BUF_ADDR_BITS(BUF_ADDR_BITS),
       .DATA_WIDTH(8)
   ) tx_bram_mux (
       .clk         (eth2_clk),
@@ -322,11 +286,7 @@ module network_bpf #(
   );
 
   // 4. TX Module Instantiation
-  eth_tx #(
-      .CPU_ID_BITS  (CPU_ID_BITS),
-      .BUF_ID_BITS  (BUF_ID_BITS),
-      .BUF_ADDR_BITS(BUF_ADDR_BITS)
-  ) eth_tx_inst (
+  eth_tx eth_tx_inst (
       .clk(eth2_clk),
       .rst(rst),
       .eth_txen(eth2_txen),
@@ -344,7 +304,7 @@ module network_bpf #(
       .o_free_buf_push_valid (tx_demux_free_buf_push_valid),
       .i_free_buf_push_ready (tx_demux_free_buf_push_ready),
 
-      // BRAM Read Interface (Muxed)
+      // BRAM Read Interface (demuxed)
       .o_rd_en  (tx_mux_bram_rd_en),
       .o_cpu_id (tx_mux_bram_cpu_id),
       .o_buf_id (tx_mux_bram_buf_id),
@@ -358,12 +318,11 @@ module network_bpf #(
   );
 
   // ------------------------------------------------------------------------
-  // Parallel CPU Islands Generation
+  // Parallel CPUs 
   // ------------------------------------------------------------------------
   generate
     for (i = 0; i < NUM_CPUS; i++) begin : cpu_block
 
-      // --- Free Buffer FIFO ---
       async_init_fifo #(
           .DATA_WIDTH(BUF_ID_BITS),
           .FIFO_DEPTH(FIFO_DEPTH),
@@ -382,7 +341,6 @@ module network_bpf #(
           .i_pop_ready (free_buf_pop_ready[i])
       );
 
-      // --- BPF Work FIFO ---
       fifo #(
           .DATA_WIDTH($bits(packet_desc_t)),
           .FIFO_DEPTH(FIFO_DEPTH)
@@ -399,7 +357,6 @@ module network_bpf #(
           .i_pop_ready(bpf_work_pop_ready[i])
       );
 
-      // --- TX Work FIFO ---
       async_fifo #(
           .DATA_WIDTH($bits(packet_desc_t)),
           .FIFO_DEPTH(FIFO_DEPTH)
@@ -417,7 +374,6 @@ module network_bpf #(
           .i_pop_ready (tx_work_pop_ready[i])
       );
 
-      // --- BRAMs ---
       xilinx_true_dual_port_read_first_1_clock_ram #(
           .RAM_WIDTH(BRAM_WIDTH),
           .RAM_DEPTH(BRAM_DEPTH)
@@ -461,11 +417,7 @@ module network_bpf #(
           .doutb(tx_rd_data[i])
       );
 
-      // --- BPF Processor ---
-      bpf_processor #(
-          .BUF_ID_BITS  (BUF_ID_BITS),
-          .BUF_ADDR_BITS(BUF_ADDR_BITS)
-      ) bpf_processor (
+      bpf_processor bpf_processor (
           .clk(eth1_clk),
           .rst(rst),
 
@@ -488,7 +440,7 @@ module network_bpf #(
   endgenerate
 
   // ------------------------------------------------------------------------
-  // Statistics Aggregation
+  // Statistics
   // ------------------------------------------------------------------------
   logic [31:0] ingress_total_bytes, ingress_received_packets, ingress_sent_packets;
   logic [31:0] egress_total_bytes, egress_received_packets, egress_sent_packets;

@@ -1,11 +1,8 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_desc_t.svh"
 
-module eth_tx #(
-    parameter int CPU_ID_BITS,
-    parameter int BUF_ID_BITS,
-    parameter int BUF_ADDR_BITS
-) (
+module eth_tx
+  import network_bpf_config_pkg::*;
+(
     input wire clk,
     input wire rst,
 
@@ -25,7 +22,7 @@ module eth_tx #(
     output logic o_free_buf_push_valid,
     input wire i_free_buf_push_ready,
 
-    // BRAM read (to mux)
+    // BRAM read (to demux)
     output logic o_rd_en,
     output logic [CPU_ID_BITS-1:0] o_cpu_id,
     output logic [BUF_ID_BITS-1:0] o_buf_id,
@@ -176,13 +173,13 @@ module eth_tx #(
                        (state == PREFETCH) ||
                        (state == SEND_FRAME && tick_cnt == 0 && byte_cnt < packet_len);
 
-  assign o_cpu_id  = current_cpu_id;
-  assign o_buf_id  = current_buf_id;
+  assign o_cpu_id = current_cpu_id;
+  assign o_buf_id = current_buf_id;
   assign o_rd_addr = byte_cnt;
 
   // Return Buffer
   assign o_free_buf_push_cpu_id = current_cpu_id;
-  assign o_free_buf_push_data    = current_buf_id;
+  assign o_free_buf_push_data = current_buf_id;
 
   // ------------------------------------------------------------------------
   // Statistics

@@ -48,9 +48,10 @@
 `define FPATH(X) `"../../bpf/X`"
 `endif  /* ! SYNTHESIS */
 
-module bpf_cpu #(
+module bpf_cpu
+  import network_bpf_config_pkg::*;
+#(
     parameter int PC_WIDTH = 8,
-    parameter int BUF_ADDR_BITS = 11,
     parameter int ROM_LATENCY = 2
 ) (
     input wire clk,

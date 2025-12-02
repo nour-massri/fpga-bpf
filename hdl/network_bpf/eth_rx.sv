@@ -1,10 +1,8 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_desc_t.svh"
-module eth_rx #(
-    parameter int CPU_ID_BITS,
-    parameter int BUF_ID_BITS,
-    parameter int BUF_ADDR_BITS
-) (
+
+module eth_rx
+  import network_bpf_config_pkg::*;
+(
     input wire clk,
     input wire rst,
 
@@ -163,17 +161,17 @@ module eth_rx #(
   //=========================================================================
 
   // BRAM Write
-  assign o_wren    = (state == RECEIVE_DATA) && byte_valid;
-  assign o_cpu_id  = current_cpu_id;
-  assign o_buf_id  = current_buf_id;
-  assign o_wr_addr = byte_cnt;
-  assign o_wr_data = byte_data;
+  assign o_wren                     = (state == RECEIVE_DATA) && byte_valid;
+  assign o_cpu_id                   = current_cpu_id;
+  assign o_buf_id                   = current_buf_id;
+  assign o_wr_addr                  = byte_cnt;
+  assign o_wr_data                  = byte_data;
 
   // BPF Work Queue
   assign o_bpf_work_push_cpu_id     = current_cpu_id;
   assign o_bpf_work_push_data.id    = current_buf_id;
   assign o_bpf_work_push_data.len   = byte_cnt;
-  assign o_bpf_work_push_data.valid = pkt_is_valid; // TODO: CRC check result
+  assign o_bpf_work_push_data.valid = pkt_is_valid;  // TODO: CRC check result
 
   // Statistics
   always_ff @(posedge clk) begin
