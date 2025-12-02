@@ -1,10 +1,8 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_desc_t.svh"
 
-module eth_tx #(
-    parameter int BUF_ID_BITS   = 2,
-    parameter int BUF_ADDR_BITS = 11
-) (
+module eth_tx
+  import network_bpf_config_pkg::*;
+(
     input wire clk,
     input wire rst,
 
@@ -12,18 +10,21 @@ module eth_tx #(
     output logic eth_txen,
     output logic [1:0] eth_txd,
 
-    // Pop side of tx_work fifo
+    // Pop side of tx_work fifo (from mux)
+    input wire [CPU_ID_BITS-1:0] i_tx_work_pop_cpu_id,
     input packet_desc_t i_tx_work_pop_data,
     input wire i_tx_work_pop_valid,
     output logic o_tx_work_pop_ready,
 
-    // Push side of free_buffer fifo (return buffer)
+    // Push side of free_buffer fifo (return buffer to demux)
+    output logic [CPU_ID_BITS-1:0] o_free_buf_push_cpu_id,
     output logic [BUF_ID_BITS-1:0] o_free_buf_push_data,
     output logic o_free_buf_push_valid,
     input wire i_free_buf_push_ready,
 
-    // BRAM read 
+    // BRAM read (to demux)
     output logic o_rd_en,
+    output logic [CPU_ID_BITS-1:0] o_cpu_id,
     output logic [BUF_ID_BITS-1:0] o_buf_id,
     output logic [BUF_ADDR_BITS-1:0] o_rd_addr,
     input wire [7:0] i_rd_data,
@@ -56,6 +57,7 @@ module eth_tx #(
 
   // Data path registers
   logic current_packet_valid;
+  logic [CPU_ID_BITS-1:0] current_cpu_id;
   logic [BUF_ID_BITS-1:0] current_buf_id;
   logic [BUF_ADDR_BITS-1:0] packet_len;
   logic [BUF_ADDR_BITS-1:0] byte_cnt;
@@ -135,6 +137,7 @@ module eth_tx #(
       byte_cnt <= 0;
       if (i_tx_work_pop_valid) begin
         current_packet_valid <= i_tx_work_pop_data.valid;
+        current_cpu_id <= i_tx_work_pop_cpu_id;
         current_buf_id <= i_tx_work_pop_data.id;
         packet_len <= i_tx_work_pop_data.len;
       end
@@ -166,13 +169,16 @@ module eth_tx #(
   assign eth_txd = (state == SEND_FRAME) ? shift_reg[1:0] : 2'b00;
 
   // BRAM Read
-  assign o_rd_en   = (state == FILTER_DESC) || 
-                       (state == PREFETCH) || 
+  assign o_rd_en   = (state == FILTER_DESC) ||
+                       (state == PREFETCH) ||
                        (state == SEND_FRAME && tick_cnt == 0 && byte_cnt < packet_len);
 
+  assign o_cpu_id = current_cpu_id;
   assign o_buf_id = current_buf_id;
   assign o_rd_addr = byte_cnt;
 
+  // Return Buffer
+  assign o_free_buf_push_cpu_id = current_cpu_id;
   assign o_free_buf_push_data = current_buf_id;
 
   // ------------------------------------------------------------------------

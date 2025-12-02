@@ -1,9 +1,8 @@
 `timescale 1ns / 1ps `default_nettype none
-`include "packet_desc_t.svh"
-module eth_rx #(
-    parameter int BUF_ID_BITS   = 2,
-    parameter int BUF_ADDR_BITS = 11
-) (
+
+module eth_rx
+  import network_bpf_config_pkg::*;
+(
     input wire clk,
     input wire rst,
 
@@ -11,18 +10,21 @@ module eth_rx #(
     input wire eth_crsdv,
     input wire [1:0] eth_rxd,
 
-    // Pop side of free_buffer fifo
+    // Pop side of free_buffer fifo (from mux)
+    input wire [CPU_ID_BITS-1:0] i_free_buf_pop_cpu_id,
     input wire [BUF_ID_BITS-1:0] i_free_buf_pop_data,
     input wire i_free_buf_pop_valid,
     output logic o_free_buf_pop_ready,
 
-    // Push side of bpf_work fifo
+    // Push side of bpf_work fifo (to demux)
+    output logic [CPU_ID_BITS-1:0] o_bpf_work_push_cpu_id,
     output packet_desc_t o_bpf_work_push_data,
     output logic o_bpf_work_push_valid,
     input wire i_bpf_work_push_ready,
 
-    // BRAM write 
+    // BRAM write (to demux)
     output logic o_wren,
+    output logic [CPU_ID_BITS-1:0] o_cpu_id,
     output logic [BUF_ID_BITS-1:0] o_buf_id,
     output logic [BUF_ADDR_BITS-1:0] o_wr_addr,
     output logic [7:0] o_wr_data,
@@ -53,6 +55,7 @@ module eth_rx #(
   logic carrier_detected;
 
   // Data path registers
+  logic [CPU_ID_BITS-1:0] current_cpu_id;
   logic [BUF_ID_BITS-1:0] current_buf_id;
   logic [BUF_ADDR_BITS-1:0] byte_cnt;
 
@@ -138,6 +141,7 @@ module eth_rx #(
 
   always_ff @(posedge clk) begin
     if (o_free_buf_pop_ready) begin
+      current_cpu_id <= i_free_buf_pop_cpu_id;
       current_buf_id <= i_free_buf_pop_data;
     end
   end
@@ -157,15 +161,17 @@ module eth_rx #(
   //=========================================================================
 
   // BRAM Write
-  assign o_wren    = (state == RECEIVE_DATA) && byte_valid;
-  assign o_buf_id  = current_buf_id;
-  assign o_wr_addr = byte_cnt;
-  assign o_wr_data = byte_data;
+  assign o_wren                     = (state == RECEIVE_DATA) && byte_valid;
+  assign o_cpu_id                   = current_cpu_id;
+  assign o_buf_id                   = current_buf_id;
+  assign o_wr_addr                  = byte_cnt;
+  assign o_wr_data                  = byte_data;
 
   // BPF Work Queue
+  assign o_bpf_work_push_cpu_id     = current_cpu_id;
   assign o_bpf_work_push_data.id    = current_buf_id;
   assign o_bpf_work_push_data.len   = byte_cnt;
-  assign o_bpf_work_push_data.valid = pkt_is_valid; // TODO: CRC check result
+  assign o_bpf_work_push_data.valid = pkt_is_valid;  // TODO: CRC check result
 
   // Statistics
   always_ff @(posedge clk) begin

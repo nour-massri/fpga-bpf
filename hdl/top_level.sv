@@ -117,7 +117,7 @@ module top_level (
   end
 
   logic [31:0] total_bytes;
-  logic [31:0] recieved_packets;
+  logic [31:0] received_packets;
   logic [31:0] sent_packets;
 
   // ------------------------------------------------------------------------
@@ -197,7 +197,7 @@ module top_level (
 
       // Statistics output
       .o_total_bytes(total_bytes),
-      .o_recieved_packets(recieved_packets),
+      .o_received_packets(received_packets),
       .o_sent_packets(sent_packets)
   );
 
@@ -231,7 +231,7 @@ module top_level (
       .clk(eth1_clk),
       .rst(sys_rst),
       .val({
-        sent_packets[23:16], recieved_packets[23:16], sent_packets[7:0], recieved_packets[7:0]
+        sent_packets[23:16], received_packets[23:16], sent_packets[7:0], received_packets[7:0]
       }),
       .cat(ss_c),
       .an({ss0_an, ss1_an})
