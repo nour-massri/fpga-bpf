@@ -169,7 +169,7 @@ module bpf_cpu #(
 						end
 
 						// Set write enable to 0, while fetching
-						scratch_mem_wren <= 1;
+						scratch_mem_wren <= 0;
 					end
 
 					// Parse retreived ROM data
@@ -245,6 +245,8 @@ module bpf_cpu #(
 										endcase
 										src_loaded <= 0;
 									end
+									state <= FETCH;
+									pc <= pc + 1;
 								end
 							end
 
@@ -253,7 +255,11 @@ module bpf_cpu #(
 							// Load instructions take multiple cycles
 							`BPF_LD: begin 
 								case (mode)
-									`BPF_IMM: A <= immediate;
+									`BPF_IMM: begin
+										A <= immediate;
+										pc <= pc + 1;
+										state <= FETCH;
+									end
 
 									// Load from index 'base_address' from packet
 									`BPF_ABS, `BPF_IND: begin
@@ -326,7 +332,7 @@ module bpf_cpu #(
 
 									`BPF_MSH: begin 
 										if (cycle_count == FIRST_BYTE) begin
-											A <= ({24'd0, i_ram_data}) << 2;
+											A <= ({24'd0, i_ram_data} & 32'h0f) << 2;
 											pc <= pc + 1;
 											state <= FETCH;
 											cycle_count <= 0;
@@ -340,7 +346,11 @@ module bpf_cpu #(
 							
 							`BPF_LDX: begin 
 								case (mode)
-									`BPF_IMM: X <= immediate;
+									`BPF_IMM: begin
+										X <= immediate;
+										pc <= pc + 1;
+										state <= FETCH;
+									end
 
 									// Load from index 'base_address' from packet
 									`BPF_ABS, `BPF_IND: begin
@@ -413,7 +423,7 @@ module bpf_cpu #(
 
 									`BPF_MSH: begin 
 										if (cycle_count == FIRST_BYTE) begin
-											X <= ({24'd0, i_ram_data}) << 2;
+											X <= ({24'd0, i_ram_data} & 32'h0f) << 2;
 											pc <= pc + 1;
 											state <= FETCH;
 											cycle_count <= 0;
@@ -430,6 +440,7 @@ module bpf_cpu #(
 								scratch_mem_wren <= 1;
 								scratch_mem_wr_data <= A;
 								state <= FETCH;
+								pc <= pc + 1;
 							end
 
 							`BPF_STX: begin
@@ -437,6 +448,8 @@ module bpf_cpu #(
 								scratch_mem_wren <= 1;
 								scratch_mem_wr_data <= X;
 								state <= FETCH;
+								pc <= pc + 1;
+
 							end
 
 							default: begin
@@ -520,7 +533,7 @@ module bpf_cpu #(
 		.RAM_WIDTH(64),            
 		.RAM_DEPTH(256),           
 		.RAM_PERFORMANCE("HIGH_PERFORMANCE"), 
-		.INIT_FILE(`FPATH(ip_and_udp.mem))
+		.INIT_FILE(`FPATH(udp_andsrc53.mem))
 	) instr_rom (
 		.addra(rom_addr),
 		.dina(64'b0),
