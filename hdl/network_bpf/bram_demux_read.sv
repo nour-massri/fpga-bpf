@@ -27,7 +27,7 @@ module bram_demux_read #(
     output logic [DATA_WIDTH-1:0]  o_mux_data
 );
 
-    logic prev_mux_cpu_id;
+    logic [CPU_ID_BITS-1:0] prev_mux_cpu_id;
     always_ff @(posedge clk) begin 
         prev_mux_cpu_id <= i_mux_cpu_id;
     end

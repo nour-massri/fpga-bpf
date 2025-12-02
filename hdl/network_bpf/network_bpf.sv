@@ -39,7 +39,7 @@ module network_bpf #(
   localparam int BRAM_DEPTH = NUM_BUFFERS_PER_CPU * BUFFER_SIZE;
   localparam int BRAM_WIDTH = 8;  // 1 byte
 
-  localparam int FIFO_DEPTH = NUM_BUFFERS_PER_CPU;
+  localparam int FIFO_DEPTH = 2 * NUM_BUFFERS_PER_CPU;
 
   // ------------------------------------------------------------------------
   // Internal FIFO Interfaces (Arrays connected to CPUs)
