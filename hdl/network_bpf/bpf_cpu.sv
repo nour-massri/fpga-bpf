@@ -8,6 +8,7 @@
 `define BPF_ALU 4
 `define BPF_JMP 5
 `define BPF_RET 6
+`define BPF_MISC 7
 
 // Sizes
 `define BPF_WORD 0
@@ -199,6 +200,17 @@ module bpf_cpu #(
 								o_pass_packet <= immediate != 0;
 							end
 
+							`BPF_MISC: begin
+								// TAX
+								if (mode == `BPF_LD) begin
+									X <= A;
+								end else begin
+									A <= X;
+								end
+								pc <= pc + 1;
+								state <= FETCH;
+							end
+
 							`BPF_JMP: begin
 								// Conditional and unconditional jumps
 								if (op == `BPF_JA) begin
@@ -250,9 +262,6 @@ module bpf_cpu #(
 								end
 							end
 
-							// TODO: Make a load module and then pass in A or X depending on the type of instruction.
-							// Only loading from BRAM with BPF_ABS, BPF_IND, BPF_MSH
-							// Load instructions take multiple cycles
 							`BPF_LD: begin 
 								case (mode)
 									`BPF_IMM: begin
@@ -533,7 +542,7 @@ module bpf_cpu #(
 		.RAM_WIDTH(64),            
 		.RAM_DEPTH(256),           
 		.RAM_PERFORMANCE("HIGH_PERFORMANCE"), 
-		.INIT_FILE(`FPATH(udp_andsrc53.mem))
+		.INIT_FILE(`FPATH(ultimate_test.mem))
 	) instr_rom (
 		.addra(rom_addr),
 		.dina(64'b0),

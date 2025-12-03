@@ -1,0 +1,24 @@
+tcpdump: data link type EN10MB
+(000) ldh      [12]
+(001) jeq      #0x800           jt 2	jf 22
+(002) ldh      [20]
+(003) jset     #0x1fff          jt 11	jf 4
+(004) ldb      [23]
+(005) jeq      #0x11            jt 6	jf 11
+(006) ldh      [20]
+(007) jset     #0x1fff          jt 11	jf 8
+(008) ldxb     4*([14]&0xf)
+(009) ld       [x + 22]
+(010) jeq      #0xdeadbeef      jt 21	jf 11
+(011) ldb      [22]
+(012) jge      #0xa             jt 22	jf 13
+(013) ldb      [23]
+(014) jeq      #0x11            jt 15	jf 22
+(015) ldh      [20]
+(016) jset     #0x1fff          jt 22	jf 17
+(017) ldxb     4*([14]&0xf)
+(018) ldb      [x + 17]
+(019) and      #0xf
+(020) jeq      #0x5             jt 21	jf 22
+(021) ret      #524288
+(022) ret      #0

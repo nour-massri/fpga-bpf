@@ -223,6 +223,110 @@ async def run_bpf_cpu_port53(dut):
     await Timer(100, units="ns")
 
 
+
+@cocotb.test()
+async def run_bpf_cpu_udp_deadbeef(dut):
+    """Basic cocotb test for bpf_cpu: drives clock/reset, provides BRAM model, starts CPU and waits for done."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    dut.rst.value = 1
+    dut.i_start.value = 0
+    dut.i_packet_len.value = 0
+    dut.i_ram_data.value = 0
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+    dut.rst.value = 0
+    await RisingEdge(dut.clk)
+
+    mem_path = Path(__file__).resolve().parent  / "ttl_less_than_ten_udp.txt"
+    pkt_mem = load_hex_mem(str(mem_path))
+    if not pkt_mem:
+        pkt_mem = [i & 0xFF for i in range(1024)]
+        dut._log.warning("ttl_correct_port_correct.txt not found; using synthetic packet data")
+
+    async def bram_model():
+        while True:
+            await RisingEdge(dut.clk)
+            if int(dut.o_ram_rd_en.value) == 1:
+                addr = int(dut.o_ram_addr.value)
+                data = pkt_mem[addr] if addr < len(pkt_mem) else 0
+                await RisingEdge(dut.clk)     
+                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
+                dut.i_ram_data.value = data
+
+    cocotb.start_soon(bram_model())
+
+    dut.i_packet_len.value = 100
+    dut.i_start.value = 1
+    await RisingEdge(dut.clk)
+    dut.i_start.value = 0
+
+    # wait for done with timeout
+    for _ in range(5000):
+        await RisingEdge(dut.clk)
+        if dut.o_done.value == 1:
+            assert dut.o_pass_packet.value == 1
+            break
+    else:
+        raise cocotb.result.TestFailure("Timeout waiting for o_done")
+
+    dut._log.info(f"BPF finished, o_pass_packet={int(dut.o_pass_packet.value)}")
+    await Timer(100, units="ns")
+
+
+
+
+@cocotb.test()
+async def run_bpf_cpu_ultimate_test(dut):
+    """Basic cocotb test for bpf_cpu: drives clock/reset, provides BRAM model, starts CPU and waits for done."""
+    cocotb.start_soon(Clock(dut.clk, 10, units="ns").start())
+
+    dut.rst.value = 1
+    dut.i_start.value = 0
+    dut.i_packet_len.value = 0
+    dut.i_ram_data.value = 0
+    await RisingEdge(dut.clk)
+    await RisingEdge(dut.clk)
+    dut.rst.value = 0
+    await RisingEdge(dut.clk)
+
+    mem_path = Path(__file__).resolve().parent  / "ultimate_test_pass_clause_1.txt"
+    pkt_mem = load_hex_mem(str(mem_path))
+    if not pkt_mem:
+        pkt_mem = [i & 0xFF for i in range(1024)]
+        dut._log.warning("ultimate_test_pass_clause_1.txt not found; using synthetic packet data")
+
+    async def bram_model():
+        while True:
+            await RisingEdge(dut.clk)
+            if int(dut.o_ram_rd_en.value) == 1:
+                addr = int(dut.o_ram_addr.value)
+                data = pkt_mem[addr] if addr < len(pkt_mem) else 0
+                await RisingEdge(dut.clk)     
+                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
+                dut.i_ram_data.value = data
+
+    cocotb.start_soon(bram_model())
+
+    dut.i_packet_len.value = 100
+    dut.i_start.value = 1
+    await RisingEdge(dut.clk)
+    dut.i_start.value = 0
+
+    # wait for done with timeout
+    for _ in range(5000):
+        await RisingEdge(dut.clk)
+        if dut.o_done.value == 1:
+            assert dut.o_pass_packet.value == 1
+            break
+    else:
+        raise cocotb.result.TestFailure("Timeout waiting for o_done")
+
+    dut._log.info(f"BPF finished, o_pass_packet={int(dut.o_pass_packet.value)}")
+    await Timer(100, units="ns")
+
+
+
 def is_runner():
     """BFP CPU Tester."""
     hdl_toplevel_lang = os.getenv("HDL_TOPLEVEL_LANG", "verilog")
