@@ -9,9 +9,9 @@ package network_bpf_config_pkg;
   // ------------------------------------------------------------------------
   // Configuration Parameters
   // ------------------------------------------------------------------------
-  localparam int NUM_CPUS = 4;
-  localparam int NUM_BUFFERS_PER_CPU = 16;
-  localparam int BUFFER_SIZE = 1024;
+  localparam int NUM_CPUS = 16;
+  localparam int NUM_BUFFERS_PER_CPU = 8;
+  localparam int BUFFER_SIZE = 2048;
 
   // ------------------------------------------------------------------------
   // Derived Parameters 
