@@ -133,6 +133,8 @@ module bpf_cpu #(
 				o_done <= 0;
 				o_pass_packet <= 0;
 				src_loaded <= 0;
+				scratch_mem_wren <= 0;
+
 			end else begin
 				case (state) 
 					IDLE: begin
@@ -152,6 +154,8 @@ module bpf_cpu #(
 						o_done <= 0;
 						o_pass_packet <= 0;
 						src_loaded <= 0;
+						scratch_mem_wren <= 0;
+
 
 						if (i_start) begin
 							pc <= 0;
@@ -214,17 +218,17 @@ module bpf_cpu #(
 							`BPF_JMP: begin
 								// Conditional and unconditional jumps
 								if (op == `BPF_JA) begin
-										pc <= pc + immediate;
+									pc <= pc + immediate;
 								end else if (op == `BPF_JEQ) begin
-										pc <= (A == immediate) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
+									pc <= (A == immediate) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
 								end else if (op == `BPF_JGT) begin
-										pc <= (A > immediate) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
+									pc <= (A > immediate) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
 								end else if (op == `BPF_JGE) begin
-										pc <= (A >= immediate) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
+									pc <= (A >= immediate) ? pc + jt_offset_reg + 1 : pc + jf_offset_reg + 1;
 								end else if (op == `BPF_JSET) begin
-										pc <= ((A & immediate) != 0) ? pc + jt_offset_reg + 1: pc + jf_offset_reg + 1;
+									pc <= ((A & immediate) != 0) ? pc + jt_offset_reg + 1: pc + jf_offset_reg + 1;
 								end else begin
-										pc <= pc + 1;
+									pc <= pc + 1;
 								end
 								state <= FETCH;
 							end
@@ -328,6 +332,7 @@ module bpf_cpu #(
 											A <= scratch_mem_rd_data;
 											pc <= pc + 1;
 											state <= FETCH;
+											cycle_count <= 0;
 										end else begin
 											cycle_count <= cycle_count + 1;
 										end
@@ -419,6 +424,7 @@ module bpf_cpu #(
 											X <= scratch_mem_rd_data;
 											pc <= pc + 1;
 											state <= FETCH;
+											cycle_count <= 0;
 										end else begin
 											cycle_count <= cycle_count + 1;
 										end
@@ -445,20 +451,25 @@ module bpf_cpu #(
 							end
 
 							`BPF_ST: begin
-								scratch_mem_wr_addr <= immediate;
-								scratch_mem_wren <= 1;
-								scratch_mem_wr_data <= A;
-								state <= FETCH;
-								pc <= pc + 1;
+								if (cycle_count ==1) begin
+									state <= FETCH;
+									pc <= pc + 1;
+									cycle_count <= 0;
+								end else begin 
+									scratch_mem_wren <= 1;
+									cycle_count <= cycle_count + 1;
+								end
 							end
 
 							`BPF_STX: begin
-								scratch_mem_wr_addr <= immediate;
-								scratch_mem_wren <= 1;
-								scratch_mem_wr_data <= X;
-								state <= FETCH;
-								pc <= pc + 1;
-
+								if (cycle_count == 1) begin
+									state <= FETCH;
+									pc <= pc + 1;
+									cycle_count <= 0;
+								end else begin 
+									scratch_mem_wren <= 1;
+									cycle_count <= cycle_count + 1;
+								end
 							end
 
 							default: begin
@@ -482,54 +493,60 @@ module bpf_cpu #(
 	always_comb begin
 	 	o_ram_rd_en = 1'b0;
     	o_ram_addr  = '0;
-		if (state == EXECUTE && (instruction_class == `BPF_LD || instruction_class == `BPF_LDX)) begin
-			if (mode == `BPF_ABS || mode == `BPF_IND || mode == `BPF_MSH) begin
-				// Choose base address
-				if (mode == `BPF_IND) begin
-					base_addr = (immediate + X);
-				end else begin
-					// BPF_ABS and BPF_MSH
-					base_addr = immediate;
-				end
+		if (state == EXECUTE) begin
+			if (instruction_class == `BPF_LD || instruction_class == `BPF_LDX) begin
+				if (mode == `BPF_ABS || mode == `BPF_IND || mode == `BPF_MSH) begin
+					// Choose base address
+					if (mode == `BPF_IND) begin
+						base_addr = (immediate + X);
+					end else begin
+						// BPF_ABS and BPF_MSH
+						base_addr = immediate;
+					end
 
-				// Initiate reads
-				if (size == `BPF_BYTE) begin
-					if (cycle_count == 0) begin
-						o_ram_rd_en = 1'b1;
-						o_ram_addr  = base_addr;
+					// Initiate reads
+					if (size == `BPF_BYTE) begin
+						if (cycle_count == 0) begin
+							o_ram_rd_en = 1'b1;
+							o_ram_addr  = base_addr;
+						end
+					end else if (size == `BPF_HALFWORD) begin
+						if (cycle_count == 0) begin
+							o_ram_rd_en = 1'b1;
+							o_ram_addr  = base_addr;
+						end else if (cycle_count == FIRST_BYTE) begin
+							o_ram_rd_en = 1'b1;
+							o_ram_addr  = base_addr + 1;
+						end
+					end else if (size == `BPF_WORD) begin
+						if (cycle_count == 0) begin
+							o_ram_rd_en = 1'b1;
+							o_ram_addr  = base_addr;
+						end else if (cycle_count == FIRST_BYTE) begin
+							o_ram_rd_en = 1'b1;
+							o_ram_addr  = base_addr + 1;
+						end else if (cycle_count == SECOND_BYTE) begin
+							o_ram_rd_en = 1'b1;
+							o_ram_addr  = base_addr + 2;
+						end else if (cycle_count == THIRD_BYTE) begin
+							o_ram_rd_en = 1'b1;
+							o_ram_addr  = base_addr + 3;
+						end
 					end
-				end else if (size == `BPF_HALFWORD) begin
+				end else if (mode == `BPF_MEM) begin
+					// Inititate read from scratch memory
 					if (cycle_count == 0) begin
-						o_ram_rd_en = 1'b1;
-						o_ram_addr  = base_addr;
-					end else if (cycle_count == FIRST_BYTE) begin
-						o_ram_rd_en = 1'b1;
-						o_ram_addr  = base_addr + 1;
+						scratch_mem_rd_addr = immediate;
 					end
-				end else if (size == `BPF_WORD) begin
-					if (cycle_count == 0) begin
-						o_ram_rd_en = 1'b1;
-						o_ram_addr  = base_addr;
-					end else if (cycle_count == FIRST_BYTE) begin
-						o_ram_rd_en = 1'b1;
-						o_ram_addr  = base_addr + 1;
-					end else if (cycle_count == SECOND_BYTE) begin
-						o_ram_rd_en = 1'b1;
-						o_ram_addr  = base_addr + 2;
-					end else if (cycle_count == THIRD_BYTE) begin
-						o_ram_rd_en = 1'b1;
-						o_ram_addr  = base_addr + 3;
-					end
-				end
-			end else if (mode == `BPF_MEM) begin
-				// Inititate read from scratch memory
-				if (cycle_count == 0) begin
-					scratch_mem_rd_addr = immediate;
-				end
+				end 
+			end else if (instruction_class == `BPF_STX) begin 
+				scratch_mem_wr_addr = immediate;
+				scratch_mem_wr_data = X;
+			end else if (instruction_class == `BPF_ST) begin 
+				scratch_mem_wr_addr = immediate;
+				scratch_mem_wr_data = A;
 			end
-			
 		end
-
 	end
  
 
@@ -542,7 +559,7 @@ module bpf_cpu #(
 		.RAM_WIDTH(64),            
 		.RAM_DEPTH(256),           
 		.RAM_PERFORMANCE("HIGH_PERFORMANCE"), 
-		.INIT_FILE(`FPATH(ultimate_test.mem))
+		.INIT_FILE(`FPATH(mul_mem.mem))
 	) instr_rom (
 		.addra(rom_addr),
 		.dina(64'b0),
@@ -571,7 +588,9 @@ module bpf_cpu #(
         .web( 1'b0 ),
         .enb( 1'b1 ),
         .rstb( rst ),
-        .doutb(scratch_mem_rd_data)
+        .doutb(scratch_mem_rd_data),
+		.regcea(1'b1), 
+        .regceb(1'b1) // Port B output register enable
     );
 
 
