@@ -188,22 +188,11 @@ module bpf_cpu #(
 						// Reset cycle count for EXECUTE stage
 						cycle_count <= 0;
 						state <= EXECUTE;
-
-						// if (rom_data[50:48] == `BPF_STX) begin
-						// 	scratch_mem_wren <= 1;
-						// 	scratch_mem_wr_addr <= rom_data[31:0];
-						// 	scratch_mem_wr_data <= X;
-						// end else if (rom_data[50:48] == `BPF_ST) begin 
-						// 	scratch_mem_wren <= 1;
-						// 	scratch_mem_wr_addr <= rom_data[31:0];
-						// 	scratch_mem_wr_data <= A;
-						// end
 					end
 
 					EXECUTE: begin							
 						case (instruction_class)
 							`BPF_RET: begin
-								// If we are executing a return instruction							
 								o_done <= 1;
 								state <= IDLE;
 								o_pass_packet <= immediate != 0;
@@ -254,10 +243,12 @@ module bpf_cpu #(
 											`BPF_ADD: A <= A + alu_src;
 											`BPF_SUB: A <= A - alu_src;
 											`BPF_MUL: A <= A * alu_src;
-											// Need to research better division instead of this expensive hunk of garbo
+
+											// TODO: Need to replace these expensive operations with a 
+											// state machine 
 											`BPF_DIV: A <= (alu_src == 0) ? 0 : (A/alu_src);
-											// Also need to search up pipelined MOD cuz this is ahh
 											`BPF_MOD: A <= (alu_src == 0) ? 0 : (A%alu_src);
+
 											`BPF_OR: A <= A | alu_src;
 											`BPF_AND: A <= A & alu_src;
 											`BPF_LSH: A <= A << (alu_src & 5'h1F);
@@ -279,7 +270,6 @@ module bpf_cpu #(
 										state <= FETCH;
 									end
 
-									// Load from index 'base_address' from packet
 									`BPF_ABS, `BPF_IND: begin
 										case (size)
 											`BPF_BYTE: begin
@@ -371,7 +361,6 @@ module bpf_cpu #(
 										state <= FETCH;
 									end
 
-									// Load from index 'base_address' from packet
 									`BPF_ABS, `BPF_IND: begin
 										case (size)
 											`BPF_BYTE: begin
@@ -455,7 +444,6 @@ module bpf_cpu #(
 								endcase
 							end
 
-							// Should not get rid of this (wait for value to be stored for next instruciton if pipelined)
 							`BPF_ST: begin
 								state <= FETCH;
 								pc <= pc + 1;
@@ -505,7 +493,6 @@ module bpf_cpu #(
 		
 		case (state) 
 			DECODE: begin
-				// Parse instruction
 				decode_class = rom_data >> 48;
 				decode_mode = rom_data >> 53;
 				decode_immediate = rom_data;
@@ -557,7 +544,7 @@ module bpf_cpu #(
 			EXECUTE: begin
 				if (instruction_class == `BPF_LD || instruction_class == `BPF_LDX) begin
 					if (mode == `BPF_ABS || mode == `BPF_IND || mode == `BPF_MSH) begin
-						// Choose base address
+
 						if (mode == `BPF_IND) begin
 							base_addr = (immediate + X);
 						end else begin
