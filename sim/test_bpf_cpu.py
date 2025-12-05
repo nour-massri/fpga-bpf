@@ -50,7 +50,6 @@ async def run_bpf_cpu_tcp(dut):
                 addr = int(dut.o_ram_addr.value)
                 data = pkt_mem[addr] if addr < len(pkt_mem) else 0
                 await RisingEdge(dut.clk)     
-                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
                 dut.i_ram_data.value = data
 
     cocotb.start_soon(bram_model())
@@ -100,7 +99,6 @@ async def run_bpf_cpu_udp(dut):
                 addr = int(dut.o_ram_addr.value)
                 data = pkt_mem[addr] if addr < len(pkt_mem) else 0
                 await RisingEdge(dut.clk)     
-                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
                 dut.i_ram_data.value = data
 
     cocotb.start_soon(bram_model())
@@ -150,7 +148,6 @@ async def run_bpf_cpu_icmp(dut):
                 addr = int(dut.o_ram_addr.value)
                 data = pkt_mem[addr] if addr < len(pkt_mem) else 0
                 await RisingEdge(dut.clk)     
-                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
                 dut.i_ram_data.value = data
 
     cocotb.start_soon(bram_model())
@@ -200,7 +197,6 @@ async def run_bpf_cpu_port53(dut):
                 addr = int(dut.o_ram_addr.value)
                 data = pkt_mem[addr] if addr < len(pkt_mem) else 0
                 await RisingEdge(dut.clk)     
-                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
                 dut.i_ram_data.value = data
 
     cocotb.start_soon(bram_model())
@@ -251,7 +247,6 @@ async def run_bpf_cpu_udp_deadbeef(dut):
                 addr = int(dut.o_ram_addr.value)
                 data = pkt_mem[addr] if addr < len(pkt_mem) else 0
                 await RisingEdge(dut.clk)     
-                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
                 dut.i_ram_data.value = data
 
     cocotb.start_soon(bram_model())
@@ -303,7 +298,6 @@ async def run_bpf_cpu_ultimate_test(dut):
                 addr = int(dut.o_ram_addr.value)
                 data = pkt_mem[addr] if addr < len(pkt_mem) else 0
                 await RisingEdge(dut.clk)     
-                await RisingEdge(dut.clk)     # emulate two-cycle registered BRAM
                 dut.i_ram_data.value = data
 
     cocotb.start_soon(bram_model())
