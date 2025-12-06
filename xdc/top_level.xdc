@@ -100,6 +100,7 @@ set_property -dict {PACKAGE_PIN F15 IOSTANDARD LVCMOS33}  [ get_ports "eth2_rxd[
 set_property -dict {PACKAGE_PIN H13 IOSTANDARD LVCMOS33}  [ get_ports "eth2_crsdv" ]
 # #set_property -dict {PACKAGE_PIN H14 IOSTANDARD LVCMOS33}  [ get_ports "pmoda[3]" ] MOC_eth2
 set_property -dict {PACKAGE_PIN J13 IOSTANDARD LVCMOS33}  [ get_ports "eth2_txen" ] 
+set_property -dict {PACKAGE_PIN J14 IOSTANDARD LVCMOS33}  [ get_ports "eth2_rxd[0]" ]
 set_property -dict {PACKAGE_PIN E14 IOSTANDARD LVCMOS33}  [ get_ports "eth2_clk" ]
 # Allow the clock to travel on non-clock routing tracks (Dirt Road)
 set_property CLOCK_DEDICATED_ROUTE FALSE [get_nets -of_objects [get_ports "eth2_clk"]]
