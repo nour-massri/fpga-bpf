@@ -67,110 +67,95 @@ module top_level (
   // ------------------------------------------------------------------------
   // --- Packet Counter --
 
-  logic display_fifo_pop_valid;
-  logic display_fifo_pop_ready;
-  logic network_statistics_valid;
+  // logic display_fifo_pop_valid;
+  // logic display_fifo_pop_ready;
+  // logic network_statistics_valid;
 
-  localparam PACKET_COUNT = 40_000;
-  localparam PUSH_CYCLES = 10_000_000;
+  // localparam PACKET_COUNT = 26;
+  // localparam PUSH_CYCLES = 10_000_000;
 
-  // --- Statistics Signals ---
-  logic [31:0] cdc_dropped_packets;
-  logic [31:0] cdc_total_packets;
-  logic [31:0] cycle_count;
-  logic is_counting;
+  // // --- Statistics Signals ---
+  // logic [31:0] cdc_dropped_packets;
+  // logic [31:0] cdc_total_packets;
+  // logic [31:0] cycle_count;
+  // logic is_counting;
 
-  evt_counter #(
-      .MAX_COUNT(PACKET_COUNT)
-  ) cycle_counter (
-      .clk(clk_pixel),
-      .rst(sys_rst),
-      .evt(1),
-      .added_num(1),
-      .count(cdc_total_packets)
-  );
-  evt_counter #(
-      .MAX_COUNT(PUSH_CYCLES)
-  ) push_counter (
-      .clk(clk_pixel),
-      .rst(sys_rst),
-      .evt(is_counting),
-      .added_num(1),
-      .count(cycle_count)
-  );
+  // evt_counter #(
+  //     .MAX_COUNT(PACKET_COUNT)
+  // ) cycle_counter (
+  //     .clk(clk_pixel),
+  //     .rst(sys_rst),
+  //     .evt(1),
+  //     .added_num(1),
+  //     .count(cdc_total_packets)
+  // );
+  // evt_counter #(
+  //     .MAX_COUNT(PUSH_CYCLES)
+  // ) push_counter (
+  //     .clk(clk_pixel),
+  //     .rst(sys_rst),
+  //     .evt(is_counting),
+  //     .added_num(1),
+  //     .count(cycle_count)
+  // );
 
-  assign cdc_dropped_packets = cdc_total_packets >> 1;
+  // assign cdc_dropped_packets = cdc_total_packets >> 1;
 
-  always_ff @(posedge clk_pixel) begin
-    if (display_fifo_pop_valid) begin
-      if (display_fifo_pop_ready) begin
-        display_fifo_pop_valid <= 0;
-      end else begin
-        is_counting <= 0;
-      end
-    end else begin
-      if (cycle_count == 9_999_999) begin
-        display_fifo_pop_valid <= 1;
-      end
-      is_counting <= 1;
-    end
-  end
+  // always_ff @(posedge clk_pixel) begin
+  //   if (display_fifo_pop_valid) begin
+  //     if (display_fifo_pop_ready) begin
+  //       display_fifo_pop_valid <= 0;
+  //     end else begin
+  //       is_counting <= 0;
+  //     end
+  //   end else begin
+  //     if (cycle_count == 9_999_999) begin
+  //       display_fifo_pop_valid <= 1;
+  //     end
+  //     is_counting <= 1;
+  //   end
+  // end
 
-  logic [31:0] total_bytes;
-  logic [31:0] received_packets;
-  logic [31:0] sent_packets;
+  // logic [31:0] total_bytes;
+  // logic [31:0] received_packets;
+  // logic [31:0] sent_packets;
 
   // ------------------------------------------------------------------------
   // Counting Real Packets from Ethernet
   // ------------------------------------------------------------------------
 
-  // logic display_fifo_push_ready;
-  // logic display_fifo_pop_valid;
-  // logic display_fifo_pop_ready;
-  // logic fifo_almost_full;
-  // logic fifo_almost_empty;
-  // logic network_statistics_valid;
-  // logic [31:0] fifo_packet_count;
+  localparam SAMPLING_CYCLES = 100_000_000;
+  logic display_fifo_push_ready;
+  logic network_statistics_valid;
+  logic [31:0] cycle_count;
+  logic [1:0] sys_rst_network_buf;
+  logic [31:0] prev_received_packets;
+  logic [31:0] new_packets;
 
-  // evt_counter#(.MAX_COUNT(SAMPLING_CYCLES)) cycle_counter(.clk(eth1_clk), .rst(sys_rst), .evt(1), .added_num(1), .count(cycle_count));
+  always_ff @(posedge eth1_clk) begin
+    sys_rst_network_buf = {sys_rst, sys_rst_network_buf[1]};
+    if (sys_rst_network_buf[0]) begin
+      prev_received_packets <= 0;
+    end else begin
+       if (cycle_count == SAMPLING_CYCLES - 1) begin
+        network_statistics_valid <= 1;
+        new_packets <= received_packets - prev_received_packets;
+        prev_received_packets <= received_packets;
+      end else begin
+        network_statistics_valid <= 0;
+      end
+    end
+  end
 
-  // always_ff @(posedge eth1_clk) begin
-  //     if (sys_rst) begin
-  //         packet_count <= 0;
-  //         sys_rst_network_buf <= 2'b00;
-  //         cdc_dropped_packets <= 0;
-  //     end else begin
-  //         // Keep network rst synchronous with clk_50mhz
-  //         sys_rst_network_buf = {sys_rst, sys_rst_network_buf[1]};
-
-  //         if (!prev_crsdv && eth1_crsdv) begin
-  //             packet_count <= packet_count + 1;
-  //         end
-  //         prev_crsdv <= eth1_crsdv;
-
-  //         if (cycle_count == (SAMPLING_CYCLES - 1)) begin 
-  //             packet_count <= 0;
-  //             network_statistics_valid <= 1;
-  //             fifo_packet_count <= packet_count;
-  //         end else begin
-  //             network_statistics_valid <= 0;
-  //         end
-  //     end
-  // end
-
-  // ------------------------------------------------------------------------
-  // Clock Domain Crossing Communication FIFO & Statistics Instantiation
-  // ------------------------------------------------------------------------
-
-  // clockdomain_fifo #(.DEPTH(), .PROGFULL_DEPTH())display_fifo_cdc (.sender_rst(sys_rst_network_buf[0]), .sender_clk(clk_50mhz), .sender_axis_tvalid(network_statistics_valid), 
-  //                                     .sender_axis_tready(display_fifo_push_ready), .sender_axis_tdata(fifo_packet_count), .sender_axis_tlast(0), 
-  //                                     .sender_axis_prog_full(fifo_almost_full), .receiver_clk(clk_pixel), .receiver_axis_tvalid(display_fifo_pop_valid), 
-  //                                     .receiver_axis_tready(display_fifo_pop_ready), .receiver_axis_tdata(cdc_total_packets), .receiver_axis_prog_empty(fifo_almost_empty) );
-
+  evt_counter#(.MAX_COUNT(SAMPLING_CYCLES)) cycle_counter(.clk(eth1_clk), .rst(sys_rst_network_buf[0]), .evt(1), .added_num(1), .count(cycle_count));
 
   // ------------------------------------------------------------------------
   // Submodule Instantiation
   // ------------------------------------------------------------------------
+
+  logic [31:0] total_bytes;
+  logic [31:0] received_packets;
+  logic [31:0] sent_packets;
 
   // --- Networking + BPF ---
   network_bpf network_bpf_submodule (
@@ -201,6 +186,25 @@ module top_level (
       .o_sent_packets(sent_packets)
   );
 
+
+  // ------------------------------------------------------------------------
+  // Clock Domain Crossing Communication FIFO & Statistics Instantiation
+  // ------------------------------------------------------------------------
+  logic [15:0] cdc_total_packets;
+  logic [31:0] cdc_packet_data;
+
+  async_init_fifo #(.DATA_WIDTH(32), .FIFO_DEPTH(32), .INIT_COUNT(0)) display_fifo_cdc (.rst(sys_rst_network_buf[0]), .push_clk(eth1_clk), .i_push_valid(network_statistics_valid), 
+                                      .o_push_ready(display_fifo_push_ready), .i_push_data(new_packets), 
+                                      .pop_clk(clk_pixel), .o_pop_valid(display_fifo_pop_valid), 
+                                      .i_pop_ready(display_fifo_pop_ready), .o_pop_data(cdc_packet_data));
+    
+  logic display_fifo_pop_valid;
+  logic display_fifo_pop_ready;
+  logic [15:0] cdc_dropped_packets;
+  assign cdc_total_packets = cdc_packet_data[31:16];
+  assign cdc_dropped_packets = 0;
+
+  
   // --- Display Controller ---
   display_controller display_controller_submodule (
       .clk_pixel(clk_pixel),
@@ -238,7 +242,11 @@ module top_level (
   );
   assign ss0_c = ss_c;
   assign ss1_c = ss_c;
-  assign led   = 16'b0;
+  assign led[0] = display_fifo_pop_valid;
+  assign led[1] = display_fifo_pop_ready;
+  assign led[2] = network_statistics_valid;
+  assign led[3] = display_fifo_push_ready;
+  assign led[15:4] = received_packets[31:16];
   assign rgb0  = 3'b0;
   assign rgb1  = 3'b0;
 endmodule

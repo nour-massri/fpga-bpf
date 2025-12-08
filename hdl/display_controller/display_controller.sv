@@ -93,29 +93,20 @@ module display_controller #(
     // When new frame signal is high we want to update the packet counts
     // and our counter
     if (rst_pixel) begin
-      packet_count_index <= 0;
+      packet_count_index <= NUM_TIME_RANGES - 1;
       for (int i = 0; i < NUM_TIME_RANGES; i = i + 1) begin
         packet_counts[i] <= 32'd0;
         dropped_packet_counts[i] <= 32'd0;
       end
     end else begin
       if (i_display_job_valid && new_frame) begin
-        // Remove least recent packetcounts
-        if (packet_count_index == NUM_TIME_RANGES - 1) begin
-          integer j;
-          for (j = NUM_TIME_RANGES - 1; j > 0; j = j - 1) begin
-            packet_counts[j] <= packet_counts[j-1];
-            dropped_packet_counts[j] <= dropped_packet_counts[j-1];
-          end
-          packet_counts[0] <= i_total_packets;
-          dropped_packet_counts[0] <= i_dropped_packets;
-          packet_count_index <= NUM_TIME_RANGES - 1;
-        end else begin
-          packet_count_index <= packet_count_index + 1;
-          packet_counts[packet_count_index+1] <= i_total_packets;
-          dropped_packet_counts[packet_count_index+1] <= i_dropped_packets;
+        integer j;
+        for (j = NUM_TIME_RANGES - 1; j > 0; j = j - 1) begin
+          packet_counts[j] <= packet_counts[j-1];
+          dropped_packet_counts[j] <= dropped_packet_counts[j-1];
         end
-
+        packet_counts[0] <= i_total_packets;
+        dropped_packet_counts[0] <= i_dropped_packets;
       end
     end
 
@@ -178,7 +169,7 @@ module display_controller #(
         blue  = 0;
         green = 0;
       end else begin
-        lower_packet_count = (NUM_PACKET_RANGES - packet_count_bucket - 1) << 10;
+        lower_packet_count = (NUM_PACKET_RANGES - packet_count_bucket - 1) << 2;
         if (lower_packet_count < current_dropped_packet_count) begin
           // Color red for dropped packets
           red   = 8'HFF;
