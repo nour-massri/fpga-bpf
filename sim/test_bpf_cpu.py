@@ -179,11 +179,12 @@ def is_runner():
     sim = os.getenv("SIM", "icarus")
     proj_path = Path(__file__).resolve().parent.parent
     sys.path.append(str(proj_path / "sim" / "model"))
-    sources = [proj_path / "hdl" / "network_bpf" / "bpf_cpu.sv"]
+    sources = [proj_path / "hdl" / "network_bpf" / "network_bpf_config_pkg.sv"]
+    sources += [proj_path / "hdl" / "network_bpf" / "bpf_cpu.sv"]
     sources += [proj_path / "hdl" / "utils" / "memories" / "xilinx_single_port_ram_read_first.v"]
 
     build_test_args = ["-Wall"]
-    parameters = {'PC_WIDTH': 8, 'BUF_ADDR_BITS': 11, "ROM_LATENCY":2}
+    parameters = {'PC_WIDTH': 8, "ROM_LATENCY":2}
     hdl_toplevel = "bpf_cpu"
     sys.path.append(str(proj_path / "sim"))
     runner = get_runner(sim)
