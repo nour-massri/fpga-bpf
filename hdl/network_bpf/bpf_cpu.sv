@@ -127,11 +127,22 @@ module bpf_cpu
     end else begin
       case (state)
         IDLE: begin
+          cycle_count <= 0;
+          rom_addr <= 0;
+          instruction_class <= 0;
+          size <= 0;
+          mode <= 0;
+          op <= 0;
+          src <= 0;
+          jt_offset_reg <= 0;
+          jf_offset_reg <= 0;
+          pc <= 0;
+          A <= 0;
+          X <= 0;
           if (i_start) begin
             // Clear done flag and start new execution
             o_done <= 0;
             o_pass_packet <= 0;
-            rom_addr <= 0;
             pc <= 0;
             state <= FETCH;
           end
