@@ -487,6 +487,7 @@ module bpf_cpu
 		//=========================================================================
 
 	logic [BUF_ADDR_BITS-1:0] base_addr;
+	logic [BUF_ADDR_BITS-1:0] ram_addr_local;
 	logic [2:0] decode_class;
 	logic [2:0] decode_mode;
 	logic [1:0] decode_size;
@@ -494,7 +495,7 @@ module bpf_cpu
 
 	always_comb begin
 	 	o_ram_rd_en = 1'b0;
-    	o_ram_addr  = '0;
+		ram_addr_local = '0;
 
 		scratch_mem_rd_addr = 0;
 
@@ -525,13 +526,13 @@ module bpf_cpu
 						// Initiate reads for all modes
 						if (decode_size == `BPF_BYTE) begin
 							o_ram_rd_en = 1'b1;
-							o_ram_addr  = base_addr;
+							ram_addr_local = base_addr;
 						end else if (decode_size == `BPF_HALFWORD) begin
 							o_ram_rd_en = 1'b1;
-							o_ram_addr  = base_addr;
+							ram_addr_local = base_addr;
 						end else if (decode_size == `BPF_WORD) begin
 							o_ram_rd_en = 1'b1;
-							o_ram_addr  = base_addr;
+							ram_addr_local = base_addr;
 						end
 					end else if (decode_mode == `BPF_MEM) begin
 						// Inititate read from scratch memory
@@ -545,13 +546,13 @@ module bpf_cpu
 					scratch_mem_wren = 1;
 					scratch_mem_wr_addr = decode_immediate;
 					scratch_mem_wr_data = A;
-				end else begin 
+				end else begin
 					// Not a load or store instruction
 					scratch_mem_wren = 0;
 					scratch_mem_wr_addr = 0;
 					scratch_mem_wr_data = 0;
 					o_ram_rd_en = 0;
-					o_ram_addr  = 0;
+					ram_addr_local = 0;
 				end
 			end
 
@@ -568,23 +569,23 @@ module bpf_cpu
 
 						// Initiate later reads
 						if (size == `BPF_BYTE) begin
-							o_ram_addr = 0;
+							ram_addr_local = 0;
 							o_ram_rd_en = 0;
 						end else if (size == `BPF_HALFWORD) begin
 							if (cycle_count == FIRST_BYTE-1) begin
 								o_ram_rd_en = 1'b1;
-								o_ram_addr  = base_addr + 1;
+								ram_addr_local = base_addr + 1;
 							end
 						end else if (size == `BPF_WORD) begin
 							if (cycle_count == FIRST_BYTE-1) begin
 								o_ram_rd_en = 1'b1;
-								o_ram_addr  = base_addr + 1;
+								ram_addr_local = base_addr + 1;
 							end else if (cycle_count == SECOND_BYTE-1) begin
 								o_ram_rd_en = 1'b1;
-								o_ram_addr  = base_addr + 2;
+								ram_addr_local = base_addr + 2;
 							end else if (cycle_count == THIRD_BYTE-1) begin
 								o_ram_rd_en = 1'b1;
-								o_ram_addr  = base_addr + 3;
+								ram_addr_local = base_addr + 3;
 							end
 						end 
 					end else if (mode == `BPF_MEM) begin
@@ -599,13 +600,13 @@ module bpf_cpu
 					scratch_mem_wren = 1;
 					scratch_mem_wr_addr = immediate;
 					scratch_mem_wr_data = A;
-				end else begin 
+				end else begin
 					// Not a load or store instruction
 					scratch_mem_wren = 0;
 					scratch_mem_wr_addr = 0;
 					scratch_mem_wr_data = 0;
 					o_ram_rd_en = 0;
-					o_ram_addr  = 0;
+					ram_addr_local = 0;
 				end 
 			end
 
@@ -616,8 +617,9 @@ module bpf_cpu
 			end
 			
 		endcase
-	
-		
+
+		// Apply preamble offset to RAM address
+		o_ram_addr = ram_addr_local + 8;
 	end
  
 
