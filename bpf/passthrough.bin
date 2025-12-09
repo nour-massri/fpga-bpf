@@ -1,0 +1,2 @@
+tcpdump: data link type EN10MB
+{ 0x6, 0, 0, 0x00080000 },
