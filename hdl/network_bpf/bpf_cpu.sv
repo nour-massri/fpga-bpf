@@ -44,8 +44,8 @@
 
 `ifdef SYNTHESIS
 `define FPATH(X) `"X`"
-`else  /* ! SYNTHESIS */
-`define FPATH(X) `"../../bpf/X`"
+`else /* ! SYNTHESIS */
+`define FPATH(X) `"../data/X`"
 `endif  /* ! SYNTHESIS */
 
 module bpf_cpu
@@ -131,6 +131,7 @@ module bpf_cpu
             // Clear done flag and start new execution
             o_done <= 0;
             o_pass_packet <= 0;
+            rom_addr <= 0;
             pc <= 0;
             state <= FETCH;
           end
@@ -199,6 +200,8 @@ module bpf_cpu
             `BPF_LD: begin
               if (mode == `BPF_IMM) begin
                 A <= immediate_reg;
+                pc <= pc + 1;
+                state <= FETCH;
               end else if (mode == `BPF_ABS) begin
                 if (size == `BPF_BYTE) begin
                   if (cycle_count == FIRST_BYTE) begin
