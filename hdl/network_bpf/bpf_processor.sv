@@ -45,6 +45,7 @@ module bpf_processor
 
   // CPU Signals
   logic cpu_start;
+  logic next_cpu_start;
   logic cpu_done;
   logic cpu_pass;
   logic cpu_rd_en;
@@ -79,7 +80,7 @@ module bpf_processor
     next_state = state;
     o_bpf_work_pop_ready = 1'b0;
     o_tx_work_push_valid = 1'b0;
-    cpu_start = 1'b0;
+    next_cpu_start = 1'b0;
 
     case (state)
       IDLE: begin
@@ -96,7 +97,7 @@ module bpf_processor
         end
       end
       START_CPU: begin
-        cpu_start  = 1'b1;
+        next_cpu_start = 1'b1;
         next_state = WAIT_CPU;
       end
       WAIT_CPU: begin
@@ -120,7 +121,9 @@ module bpf_processor
     if (rst) begin
       desc_reg <= '0;
       final_decision_pass <= 1'b0;
+      cpu_start <= 1'b0;
     end else begin
+      cpu_start <= next_cpu_start;
       if (state == IDLE && i_bpf_work_pop_valid) begin
         desc_reg <= i_bpf_work_pop_data;
       end else if (state == CHECK_VALIDITY) begin
