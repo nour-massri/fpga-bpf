@@ -4,6 +4,7 @@ module top_level (
     input wire clk_100mhz,
     input wire [3:0] btn,
 
+    input wire [15:0]   sw,
     output logic [15:0] led,
     output logic [ 2:0] rgb0,
     output logic [ 2:0] rgb1,
@@ -160,6 +161,7 @@ module top_level (
   // --- Networking + BPF ---
   network_bpf network_bpf_submodule (
       .rst(sys_rst),
+      .sw(sw),
 
       // Ingress 
       .eth1_clk  (eth1_clk),

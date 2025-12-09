@@ -5,6 +5,7 @@ module bpf_processor
 (
     input wire clk,
     input wire rst,
+    input wire [15:0] sw,
 
     // Pop side of bpf_work fifo
     input packet_desc_t i_bpf_work_pop_data,
@@ -25,6 +26,8 @@ module bpf_processor
     // Statistics
     output logic o_pkt_bpf_dropped_pulse
 );
+  logic i_bypass_sw;
+  assign i_bypass_sw = sw[0];
 
   //=========================================================================
   // 1. Internal Signals & States
@@ -92,6 +95,8 @@ module bpf_processor
       CHECK_VALIDITY: begin
         if (!desc_reg.valid) begin
           next_state = PUSH_WORK;
+        end else if (i_bypass_sw) begin
+          next_state = PUSH_WORK;
         end else begin
           next_state = START_CPU;
         end
@@ -129,6 +134,8 @@ module bpf_processor
       end else if (state == CHECK_VALIDITY) begin
         if (!desc_reg.valid) begin
           final_decision_pass <= 1'b0;
+        end else if (i_bypass_sw) begin
+          final_decision_pass <= 1'b1;
         end
       end else if (state == WAIT_CPU && cpu_done) begin
         final_decision_pass <= cpu_pass;

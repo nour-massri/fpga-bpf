@@ -4,6 +4,7 @@ module network_bpf
   import network_bpf_config_pkg::*;
 (
     input wire rst,
+    input wire [15:0] sw,
 
     // Port 1 (Ingress)
     input wire eth1_clk,
@@ -420,6 +421,7 @@ module network_bpf
       bpf_processor bpf_processor (
           .clk(eth1_clk),
           .rst(rst),
+          .sw(sw),
 
           .i_bpf_work_pop_data (bpf_work_pop_data[i]),
           .i_bpf_work_pop_valid(bpf_work_pop_valid[i]),

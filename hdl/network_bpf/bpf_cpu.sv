@@ -277,42 +277,41 @@ module bpf_cpu
   // Data path
   //=========================================================================
 
-  logic [BUF_ADDR_BITS-1:0] base_addr;
+  logic [BUF_ADDR_BITS-1:0] local_addr;
   always_comb begin
     o_ram_rd_en = 1'b0;
-    o_ram_addr  = '0;
+    local_addr  = '0;
     if (state == EXECUTE && instruction_class == `BPF_LD && mode == `BPF_ABS) begin
-      // address includes +2 offset because of preamble
-      base_addr = immediate_reg;
       if (size == `BPF_BYTE) begin
         if (cycle_count == 0) begin
           o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr;
+          local_addr  = immediate_reg;
         end
       end else if (size == `BPF_HALFWORD) begin
         if (cycle_count == 0) begin
           o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr;
+          local_addr  = immediate_reg;
         end else if (cycle_count == FIRST_BYTE) begin
           o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 1;
+          local_addr  = immediate_reg + 1;
         end
       end else if (size == `BPF_WORD) begin
         if (cycle_count == 0) begin
           o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr;
+          local_addr  = immediate_reg;
         end else if (cycle_count == FIRST_BYTE) begin
           o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 1;
+          local_addr  = immediate_reg + 1;
         end else if (cycle_count == SECOND_BYTE) begin
           o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 2;
+          local_addr  = immediate_reg + 2;
         end else if (cycle_count == THIRD_BYTE) begin
           o_ram_rd_en = 1'b1;
-          o_ram_addr  = base_addr + 3;
+          local_addr  = immediate_reg + 3;
         end
       end
     end
+    o_ram_addr = local_addr + 8;
   end
 
 
@@ -323,7 +322,7 @@ module bpf_cpu
       .RAM_WIDTH(64),
       .RAM_DEPTH(256),
       .RAM_PERFORMANCE("HIGH_PERFORMANCE"),
-      .INIT_FILE(`FPATH(passthrough.mem))
+      .INIT_FILE(`FPATH(ip_and_udp.mem))
   ) instr_rom (
       .addra(rom_addr),
       .dina(64'b0),
