@@ -20,10 +20,13 @@ module network_bpf
     output logic eth2_txen,
     output logic [1:0] eth2_txd,
 
-    // Statistics output 
-    output logic [31:0] o_total_bytes,
-    output logic [31:0] o_received_packets,
-    output logic [31:0] o_sent_packets
+    // Statistics output
+    output logic [31:0] o_ingress_total_bytes,
+    output logic [31:0] o_ingress_received_packets,
+    output logic [31:0] o_ingress_dropped_packets,
+    output logic [31:0] o_egress_total_bytes,
+    output logic [31:0] o_egress_received_packets,
+    output logic [31:0] o_egress_dropped_packets
 );
 
   // ------------------------------------------------------------------------
@@ -99,11 +102,11 @@ module network_bpf
   // ------------------------------------------------------------------------
   logic                   pkt_ingress_byte_active;
   logic                   pkt_ingress_received_pulse;
-  logic                   pkt_ingress_sent_pulse;
+  logic                   pkt_ingress_dropped_pulse;
 
   logic                   pkt_egress_byte_active;
   logic                   pkt_egress_received_pulse;
-  logic                   pkt_egress_sent_pulse;
+  logic                   pkt_egress_dropped_pulse;
 
   // ========================================================================
   // RX SIDE (Ingress)
@@ -208,7 +211,7 @@ module network_bpf
       // Stats
       .o_byte_active       (pkt_ingress_byte_active),
       .o_pkt_received_pulse(pkt_ingress_received_pulse),
-      .o_pkt_sent_pulse    (pkt_ingress_sent_pulse)
+      .o_pkt_dropped_pulse (pkt_ingress_dropped_pulse)
   );
 
 
@@ -315,7 +318,7 @@ module network_bpf
       // Stats
       .o_byte_active       (pkt_egress_byte_active),
       .o_pkt_received_pulse(pkt_egress_received_pulse),
-      .o_pkt_sent_pulse    (pkt_egress_sent_pulse)
+      .o_pkt_dropped_pulse (pkt_egress_dropped_pulse)
   );
 
   // ------------------------------------------------------------------------
@@ -444,19 +447,19 @@ module network_bpf
   // ------------------------------------------------------------------------
   // Statistics
   // ------------------------------------------------------------------------
-  logic [31:0] ingress_total_bytes, ingress_received_packets, ingress_sent_packets;
-  logic [31:0] egress_total_bytes, egress_received_packets, egress_sent_packets;
+  logic [31:0] ingress_total_bytes, ingress_received_packets, ingress_dropped_packets;
+  logic [31:0] egress_total_bytes, egress_received_packets, egress_dropped_packets;
 
   network_bpf_statistics ingress_stats (
       .clk(eth1_clk),
       .rst(rst),
       .i_byte_active(pkt_ingress_byte_active),
       .i_pkt_received(pkt_ingress_received_pulse),
-      .i_pkt_sent(pkt_ingress_sent_pulse),
+      .i_pkt_dropped(pkt_ingress_dropped_pulse),
 
       .o_total_bytes(ingress_total_bytes),
       .o_received_packets(ingress_received_packets),
-      .o_sent_packets(ingress_sent_packets)
+      .o_dropped_packets(ingress_dropped_packets)
   );
 
   network_bpf_statistics egress_stats (
@@ -464,16 +467,19 @@ module network_bpf
       .rst(rst),
       .i_byte_active(pkt_egress_byte_active),
       .i_pkt_received(pkt_egress_received_pulse),
-      .i_pkt_sent(pkt_egress_sent_pulse),
+      .i_pkt_dropped(pkt_egress_dropped_pulse),
 
       .o_total_bytes(egress_total_bytes),
       .o_received_packets(egress_received_packets),
-      .o_sent_packets(egress_sent_packets)
+      .o_dropped_packets(egress_dropped_packets)
   );
 
-  assign o_total_bytes = {ingress_total_bytes[15:0], egress_total_bytes[15:0]};
-  assign o_received_packets = {ingress_received_packets[15:0], egress_received_packets[15:0]};
-  assign o_sent_packets = {ingress_sent_packets[15:0], egress_sent_packets[15:0]};
+  assign o_ingress_total_bytes = ingress_total_bytes;
+  assign o_ingress_received_packets = ingress_received_packets;
+  assign o_ingress_dropped_packets = ingress_dropped_packets;
+  assign o_egress_total_bytes = egress_total_bytes;
+  assign o_egress_received_packets = egress_received_packets;
+  assign o_egress_dropped_packets = egress_dropped_packets;
 
   // ------------------------------------------------------------------------
   // eth2 -> eth1 Pass-Through 
@@ -596,7 +602,7 @@ module network_bpf
 
       .o_byte_active       (),
       .o_pkt_received_pulse(),
-      .o_pkt_sent_pulse    ()
+      .o_pkt_dropped_pulse    ()
   );
 
   eth_tx eth1_tx_inst (
@@ -623,7 +629,7 @@ module network_bpf
 
       .o_byte_active       (),
       .o_pkt_received_pulse(),
-      .o_pkt_sent_pulse    ()
+      .o_pkt_dropped_pulse    ()
   );
 
 endmodule

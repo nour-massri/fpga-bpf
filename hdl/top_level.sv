@@ -131,17 +131,22 @@ module top_level (
   logic [31:0] cycle_count;
   logic [1:0] sys_rst_network_buf;
   logic [31:0] prev_received_packets;
+  logic [31:0] prev_dropped_packets;
   logic [31:0] new_packets;
+  logic [31:0] new_dropped;
 
-  always_ff @(posedge eth1_clk) begin
+  always_ff @(posedge eth2_clk) begin
     sys_rst_network_buf = {sys_rst, sys_rst_network_buf[1]};
     if (sys_rst_network_buf[0]) begin
       prev_received_packets <= 0;
+      prev_dropped_packets <= 0;
     end else begin
       if (cycle_count == SAMPLING_CYCLES - 1) begin
         network_statistics_valid <= 1;
-        new_packets <= received_packets - prev_received_packets;
-        prev_received_packets <= received_packets;
+        new_packets <= egress_received_packets - prev_received_packets;
+        new_dropped <= egress_dropped_packets - prev_dropped_packets;
+        prev_received_packets <= egress_received_packets;
+        prev_dropped_packets <= egress_dropped_packets;
       end else begin
         network_statistics_valid <= 0;
       end
@@ -151,7 +156,7 @@ module top_level (
   evt_counter #(
       .MAX_COUNT(SAMPLING_CYCLES)
   ) cycle_counter (
-      .clk(eth1_clk),
+      .clk(eth2_clk),
       .rst(sys_rst_network_buf[0]),
       .evt(1),
       .added_num(1),
@@ -162,16 +167,15 @@ module top_level (
   // Submodule Instantiation
   // ------------------------------------------------------------------------
 
-  logic [31:0] total_bytes;
-  logic [31:0] received_packets;
-  logic [31:0] sent_packets;
+  logic [31:0] ingress_total_bytes, ingress_received_packets, ingress_dropped_packets;
+  logic [31:0] egress_total_bytes, egress_received_packets, egress_dropped_packets;
 
   // --- Networking + BPF ---
   network_bpf network_bpf_submodule (
       .rst(sys_rst),
       .sw (sw),
 
-      // Ingress 
+      // Ingress
       .eth1_clk  (eth1_clk),
       .eth1_crsdv(eth1_crsdv),
       .eth1_rxd  (eth1_rxd),
@@ -191,39 +195,42 @@ module top_level (
       //   .i_display_fifo_full(display_fifo_full),
 
       // Statistics output
-      .o_total_bytes(total_bytes),
-      .o_received_packets(received_packets),
-      .o_sent_packets(sent_packets)
+      .o_ingress_total_bytes(ingress_total_bytes),
+      .o_ingress_received_packets(ingress_received_packets),
+      .o_ingress_dropped_packets(ingress_dropped_packets),
+      .o_egress_total_bytes(egress_total_bytes),
+      .o_egress_received_packets(egress_received_packets),
+      .o_egress_dropped_packets(egress_dropped_packets)
   );
 
 
   // ------------------------------------------------------------------------
   // Clock Domain Crossing Communication FIFO & Statistics Instantiation
   // ------------------------------------------------------------------------
-  logic [15:0] cdc_total_packets;
-  logic [31:0] cdc_packet_data;
+  logic [31:0] cdc_total_packets;
+  logic [31:0] cdc_dropped_packets;
+  logic [63:0] cdc_fifo_data;
 
   async_init_fifo #(
-      .DATA_WIDTH(32),
+      .DATA_WIDTH(64),
       .FIFO_DEPTH(32),
       .INIT_COUNT(0)
   ) display_fifo_cdc (
       .rst(sys_rst_network_buf[0]),
-      .push_clk(eth1_clk),
+      .push_clk(eth2_clk),
       .i_push_valid(network_statistics_valid),
       .o_push_ready(display_fifo_push_ready),
-      .i_push_data(new_packets),
+      .i_push_data({new_packets, new_dropped}),
       .pop_clk(clk_pixel),
       .o_pop_valid(display_fifo_pop_valid),
       .i_pop_ready(display_fifo_pop_ready),
-      .o_pop_data(cdc_packet_data)
+      .o_pop_data(cdc_fifo_data)
   );
 
   logic display_fifo_pop_valid;
   logic display_fifo_pop_ready;
-  logic [15:0] cdc_dropped_packets;
-  assign cdc_total_packets   = cdc_packet_data[31:16];
-  assign cdc_dropped_packets = 0;
+  assign cdc_total_packets = cdc_fifo_data[63:32];
+  assign cdc_dropped_packets = cdc_fifo_data[31:0];
 
 
   // --- Display Controller ---
@@ -253,21 +260,15 @@ module top_level (
 
   logic [6:0] ss_c;
   seven_segment_controller scc (
-      .clk(eth1_clk),
+      .clk(eth2_clk),
       .rst(sys_rst),
-      .val({
-        sent_packets[23:16], received_packets[23:16], sent_packets[7:0], received_packets[7:0]
-      }),
+      .val(egress_received_packets),
       .cat(ss_c),
       .an({ss0_an, ss1_an})
   );
   assign ss0_c = ss_c;
   assign ss1_c = ss_c;
-  assign led[0] = display_fifo_pop_valid;
-  assign led[1] = display_fifo_pop_ready;
-  assign led[2] = network_statistics_valid;
-  assign led[3] = display_fifo_push_ready;
-  assign led[15:4] = received_packets[31:16];
+  assign led = egress_dropped_packets[15:0];
   assign rgb0 = 3'b0;
   assign rgb1 = 3'b0;
 endmodule

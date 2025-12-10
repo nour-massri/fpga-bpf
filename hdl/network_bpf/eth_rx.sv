@@ -32,7 +32,7 @@ module eth_rx
     // Statistics
     output logic o_byte_active,
     output logic o_pkt_received_pulse,
-    output logic o_pkt_sent_pulse
+    output logic o_pkt_dropped_pulse
 );
 
   //=========================================================================
@@ -177,8 +177,8 @@ module eth_rx
   always_ff @(posedge clk) begin
     o_pkt_received_pulse <= o_free_buf_pop_ready;
     o_byte_active <= byte_valid;
-    // TODO: Implement proper drop logic
-    o_pkt_sent_pulse <= o_bpf_work_push_valid;
+    // Drop logic: packet is dropped if not valid when pushing to work queue
+    o_pkt_dropped_pulse <= o_bpf_work_push_valid && !pkt_is_valid;
   end
 
 endmodule

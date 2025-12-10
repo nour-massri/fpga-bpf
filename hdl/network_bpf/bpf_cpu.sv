@@ -157,20 +157,28 @@ module bpf_cpu
 
         // Parse retreived ROM data
         DECODE: begin
-          mode <= rom_data[55:53];
-          size <= rom_data[52:51];
+          if (rom_data == 0) begin
+            instruction_class <= `BPF_RET;
+            immediate_reg <= 0;
+            // Zero out others to prevent X propagation
+            mode <= 0; size <= 0; op <= 0; src <= 0;
+            jt_offset_reg <= 0; jf_offset_reg <= 0;
+          end else begin 
+            mode <= rom_data[55:53];
+            size <= rom_data[52:51];
 
-          op <= rom_data[55:52];
-          src <= rom_data[51];
+            op <= rom_data[55:52];
+            src <= rom_data[51];
 
-          instruction_class <= rom_data[50:48];
-          jt_offset_reg <= rom_data[47:40];
-          jf_offset_reg <= rom_data[39:32];
-          immediate_reg <= rom_data[31:0];
+            instruction_class <= rom_data[50:48];
+            jt_offset_reg <= rom_data[47:40];
+            jf_offset_reg <= rom_data[39:32];
+            immediate_reg <= rom_data[31:0];
 
-          // Reset cycle count for EXECUTE stage
-          cycle_count <= 0;
-          state <= EXECUTE;
+            // Reset cycle count for EXECUTE stage
+            cycle_count <= 0;
+            state <= EXECUTE;
+          end
         end
 
         EXECUTE: begin
@@ -255,6 +263,9 @@ module bpf_cpu
                 A <= i_packet_len;
                 pc <= pc + 1;
                 state <= FETCH;
+              end else begin // not supported
+                pc <= pc + 1;
+                state <= FETCH;
               end
             end
 
@@ -317,7 +328,7 @@ module bpf_cpu
       .RAM_WIDTH(64),
       .RAM_DEPTH(256),
       .RAM_PERFORMANCE("HIGH_PERFORMANCE"),
-      .INIT_FILE(`FPATH(streaming2.mem))
+      .INIT_FILE(`FPATH(ip_and_udp.mem))
   ) instr_rom (
       .addra(rom_addr),
       .dina(64'b0),

@@ -32,7 +32,7 @@ module eth_tx
     // Statistics
     output logic o_byte_active,
     output logic o_pkt_received_pulse,
-    output logic o_pkt_sent_pulse
+    output logic o_pkt_dropped_pulse
 );
 
   //=========================================================================
@@ -188,7 +188,8 @@ module eth_tx
   always_ff @(posedge clk) begin
     o_pkt_received_pulse <= o_tx_work_pop_ready;
     o_byte_active <= (state == SEND_FRAME) && (tick_cnt == 3);
-    o_pkt_sent_pulse <= (state == PREFETCH);
+    // Drop logic: packet is dropped if not valid when filtered out
+    o_pkt_dropped_pulse <= (state == FILTER_DESC) && !current_packet_valid;
   end
 endmodule
 `default_nettype wire
