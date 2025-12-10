@@ -83,7 +83,7 @@
 //             jt_offset_reg <= rom_data[47:40];
 //             jf_offset_reg <= rom_data[39:32];
 //             immediate <= rom_data[31:0];
-            
+
 //             // Reset cycle count for EXECUTE stage
 //             cycle_count <= 0;
 //             state <= EXECUTE;

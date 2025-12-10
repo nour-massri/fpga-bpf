@@ -4,7 +4,7 @@ module top_level (
     input wire clk_100mhz,
     input wire [3:0] btn,
 
-    input wire [15:0]   sw,
+    input  wire  [15:0] sw,
     output logic [15:0] led,
     output logic [ 2:0] rgb0,
     output logic [ 2:0] rgb1,
@@ -138,7 +138,7 @@ module top_level (
     if (sys_rst_network_buf[0]) begin
       prev_received_packets <= 0;
     end else begin
-       if (cycle_count == SAMPLING_CYCLES - 1) begin
+      if (cycle_count == SAMPLING_CYCLES - 1) begin
         network_statistics_valid <= 1;
         new_packets <= received_packets - prev_received_packets;
         prev_received_packets <= received_packets;
@@ -148,7 +148,15 @@ module top_level (
     end
   end
 
-  evt_counter#(.MAX_COUNT(SAMPLING_CYCLES)) cycle_counter(.clk(eth1_clk), .rst(sys_rst_network_buf[0]), .evt(1), .added_num(1), .count(cycle_count));
+  evt_counter #(
+      .MAX_COUNT(SAMPLING_CYCLES)
+  ) cycle_counter (
+      .clk(eth1_clk),
+      .rst(sys_rst_network_buf[0]),
+      .evt(1),
+      .added_num(1),
+      .count(cycle_count)
+  );
 
   // ------------------------------------------------------------------------
   // Submodule Instantiation
@@ -161,7 +169,7 @@ module top_level (
   // --- Networking + BPF ---
   network_bpf network_bpf_submodule (
       .rst(sys_rst),
-      .sw(sw),
+      .sw (sw),
 
       // Ingress 
       .eth1_clk  (eth1_clk),
@@ -195,18 +203,29 @@ module top_level (
   logic [15:0] cdc_total_packets;
   logic [31:0] cdc_packet_data;
 
-  async_init_fifo #(.DATA_WIDTH(32), .FIFO_DEPTH(32), .INIT_COUNT(0)) display_fifo_cdc (.rst(sys_rst_network_buf[0]), .push_clk(eth1_clk), .i_push_valid(network_statistics_valid), 
-                                      .o_push_ready(display_fifo_push_ready), .i_push_data(new_packets), 
-                                      .pop_clk(clk_pixel), .o_pop_valid(display_fifo_pop_valid), 
-                                      .i_pop_ready(display_fifo_pop_ready), .o_pop_data(cdc_packet_data));
-    
+  async_init_fifo #(
+      .DATA_WIDTH(32),
+      .FIFO_DEPTH(32),
+      .INIT_COUNT(0)
+  ) display_fifo_cdc (
+      .rst(sys_rst_network_buf[0]),
+      .push_clk(eth1_clk),
+      .i_push_valid(network_statistics_valid),
+      .o_push_ready(display_fifo_push_ready),
+      .i_push_data(new_packets),
+      .pop_clk(clk_pixel),
+      .o_pop_valid(display_fifo_pop_valid),
+      .i_pop_ready(display_fifo_pop_ready),
+      .o_pop_data(cdc_packet_data)
+  );
+
   logic display_fifo_pop_valid;
   logic display_fifo_pop_ready;
   logic [15:0] cdc_dropped_packets;
-  assign cdc_total_packets = cdc_packet_data[31:16];
+  assign cdc_total_packets   = cdc_packet_data[31:16];
   assign cdc_dropped_packets = 0;
 
-  
+
   // --- Display Controller ---
   display_controller display_controller_submodule (
       .clk_pixel(clk_pixel),
@@ -249,8 +268,8 @@ module top_level (
   assign led[2] = network_statistics_valid;
   assign led[3] = display_fifo_push_ready;
   assign led[15:4] = received_packets[31:16];
-  assign rgb0  = 3'b0;
-  assign rgb1  = 3'b0;
+  assign rgb0 = 3'b0;
+  assign rgb1 = 3'b0;
 endmodule
 
 `default_nettype wire

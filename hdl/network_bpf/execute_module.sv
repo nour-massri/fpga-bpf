@@ -231,10 +231,10 @@
 //                                 cycle_count <= cycle_count + 1;
 //                             end
 //                         end	
-                                
+
 //                     endcase
 //                 end
-                
+
 //                 `BPF_LDX: begin 
 //                     case (mode)
 //                         `BPF_IMM: begin
@@ -322,7 +322,7 @@
 //                                 cycle_count <= cycle_count + 1;
 //                             end
 //                         end	
-                                
+
 //                     endcase
 //                 end
 

@@ -421,7 +421,7 @@ module network_bpf
       bpf_processor bpf_processor (
           .clk(eth1_clk),
           .rst(rst),
-          .sw(sw),
+          .sw (sw),
 
           .i_bpf_work_pop_data (bpf_work_pop_data[i]),
           .i_bpf_work_pop_valid(bpf_work_pop_valid[i]),
@@ -478,35 +478,35 @@ module network_bpf
   // ------------------------------------------------------------------------
   // eth2 -> eth1 Pass-Through 
   // ------------------------------------------------------------------------
-  
-  logic [BUF_ID_BITS-1:0] rev_free_buf_pop_data;
-  logic                   rev_free_buf_pop_valid;
-  logic                   rev_free_buf_pop_ready;
 
-  logic [BUF_ID_BITS-1:0] rev_free_buf_push_data;
-  logic                   rev_free_buf_push_valid;
-  logic                   rev_free_buf_push_ready;
+  logic         [   BUF_ID_BITS-1:0] rev_free_buf_pop_data;
+  logic                              rev_free_buf_pop_valid;
+  logic                              rev_free_buf_pop_ready;
 
-  packet_desc_t           rev_work_push_data;
-  logic                   rev_work_push_valid;
-  logic                   rev_work_push_ready;
+  logic         [   BUF_ID_BITS-1:0] rev_free_buf_push_data;
+  logic                              rev_free_buf_push_valid;
+  logic                              rev_free_buf_push_ready;
 
-  packet_desc_t           rev_work_pop_data;
-  logic                   rev_work_pop_valid;
-  logic                   rev_work_pop_ready;
+  packet_desc_t                      rev_work_push_data;
+  logic                              rev_work_push_valid;
+  logic                              rev_work_push_ready;
 
-  logic                   rev_rx_wr_en;
-  logic [BRAM_ADDR_BITS-1:0] rev_rx_bram_addr; 
-  logic [7:0]             rev_rx_wr_data;
-  logic [BUF_ID_BITS-1:0] rev_rx_buf_id;
-  logic [BUF_ADDR_BITS-1:0] rev_rx_buf_addr;
+  packet_desc_t                      rev_work_pop_data;
+  logic                              rev_work_pop_valid;
+  logic                              rev_work_pop_ready;
+
+  logic                              rev_rx_wr_en;
+  logic         [BRAM_ADDR_BITS-1:0] rev_rx_bram_addr;
+  logic         [               7:0] rev_rx_wr_data;
+  logic         [   BUF_ID_BITS-1:0] rev_rx_buf_id;
+  logic         [ BUF_ADDR_BITS-1:0] rev_rx_buf_addr;
   assign rev_rx_bram_addr = {rev_rx_buf_id, rev_rx_buf_addr};
 
-  logic                   rev_tx_rd_en;
+  logic                      rev_tx_rd_en;
   logic [BRAM_ADDR_BITS-1:0] rev_tx_bram_addr;
-  logic [7:0]             rev_tx_rd_data;
-  logic [BUF_ID_BITS-1:0] rev_tx_buf_id;
-  logic [BUF_ADDR_BITS-1:0] rev_tx_buf_addr;
+  logic [               7:0] rev_tx_rd_data;
+  logic [   BUF_ID_BITS-1:0] rev_tx_buf_id;
+  logic [ BUF_ADDR_BITS-1:0] rev_tx_buf_addr;
   assign rev_tx_bram_addr = {rev_tx_buf_id, rev_tx_buf_addr};
 
   // ------------------------------------------------------------------------
@@ -518,57 +518,57 @@ module network_bpf
       .FIFO_DEPTH(FIFO_DEPTH),
       .INIT_COUNT(NUM_BUFFERS_PER_CPU)
   ) rev_free_list_fifo (
-      .rst          (rst),
-      
-      .push_clk     (eth1_clk),
-      .i_push_data  (rev_free_buf_push_data),
-      .i_push_valid (rev_free_buf_push_valid),
-      .o_push_ready (rev_free_buf_push_ready),
+      .rst(rst),
 
-      .pop_clk      (eth2_clk),
-      .o_pop_data   (rev_free_buf_pop_data),
-      .o_pop_valid  (rev_free_buf_pop_valid),
-      .i_pop_ready  (rev_free_buf_pop_ready)
+      .push_clk    (eth1_clk),
+      .i_push_data (rev_free_buf_push_data),
+      .i_push_valid(rev_free_buf_push_valid),
+      .o_push_ready(rev_free_buf_push_ready),
+
+      .pop_clk    (eth2_clk),
+      .o_pop_data (rev_free_buf_pop_data),
+      .o_pop_valid(rev_free_buf_pop_valid),
+      .i_pop_ready(rev_free_buf_pop_ready)
   );
 
   async_fifo #(
       .DATA_WIDTH($bits(packet_desc_t)),
       .FIFO_DEPTH(FIFO_DEPTH)
   ) rev_work_fifo (
-      .rst          (rst),
+      .rst(rst),
 
-      .push_clk     (eth2_clk),
-      .i_push_data  (rev_work_push_data),
-      .i_push_valid (rev_work_push_valid),
-      .o_push_ready (rev_work_push_ready),
+      .push_clk    (eth2_clk),
+      .i_push_data (rev_work_push_data),
+      .i_push_valid(rev_work_push_valid),
+      .o_push_ready(rev_work_push_ready),
 
-      .pop_clk      (eth1_clk),
-      .o_pop_data   (rev_work_pop_data),
-      .o_pop_valid  (rev_work_pop_valid),
-      .i_pop_ready  (rev_work_pop_ready)
+      .pop_clk    (eth1_clk),
+      .o_pop_data (rev_work_pop_data),
+      .o_pop_valid(rev_work_pop_valid),
+      .i_pop_ready(rev_work_pop_ready)
   );
 
   xilinx_true_dual_port_read_first_2_clock_ram #(
       .RAM_WIDTH(BRAM_WIDTH),
       .RAM_DEPTH(BRAM_DEPTH)
   ) rev_packet_bram (
-      .clka   (eth2_clk),
-      .addra  (rev_rx_bram_addr),
-      .dina   (rev_rx_wr_data),
-      .wea    (rev_rx_wr_en),
-      .ena    (1'b1),
-      .regcea (1'b1),
-      .rsta   (rst),
-      .douta  (), 
+      .clka  (eth2_clk),
+      .addra (rev_rx_bram_addr),
+      .dina  (rev_rx_wr_data),
+      .wea   (rev_rx_wr_en),
+      .ena   (1'b1),
+      .regcea(1'b1),
+      .rsta  (rst),
+      .douta (),
 
-      .clkb   (eth1_clk),
-      .addrb  (rev_tx_bram_addr),
-      .dinb   (8'h0),
-      .web    (1'b0),
-      .enb    (rev_tx_rd_en), 
-      .regceb (1'b1),
-      .rstb   (rst),
-      .doutb  (rev_tx_rd_data)
+      .clkb  (eth1_clk),
+      .addrb (rev_tx_bram_addr),
+      .dinb  (8'h0),
+      .web   (1'b0),
+      .enb   (rev_tx_rd_en),
+      .regceb(1'b1),
+      .rstb  (rst),
+      .doutb (rev_tx_rd_data)
   );
 
   eth_rx eth2_rx_inst (
@@ -578,12 +578,12 @@ module network_bpf
       .eth_crsdv(eth2_crsdv),
       .eth_rxd  (eth2_rxd),
 
-      .i_free_buf_pop_cpu_id (0), 
-      .i_free_buf_pop_data   (rev_free_buf_pop_data),
-      .i_free_buf_pop_valid  (rev_free_buf_pop_valid),
-      .o_free_buf_pop_ready  (rev_free_buf_pop_ready),
+      .i_free_buf_pop_cpu_id(0),
+      .i_free_buf_pop_data  (rev_free_buf_pop_data),
+      .i_free_buf_pop_valid (rev_free_buf_pop_valid),
+      .o_free_buf_pop_ready (rev_free_buf_pop_ready),
 
-      .o_bpf_work_push_cpu_id(), 
+      .o_bpf_work_push_cpu_id(),
       .o_bpf_work_push_data  (rev_work_push_data),
       .o_bpf_work_push_valid (rev_work_push_valid),
       .i_bpf_work_push_ready (rev_work_push_ready),
@@ -594,21 +594,21 @@ module network_bpf
       .o_wr_addr(rev_rx_buf_addr),
       .o_wr_data(rev_rx_wr_data),
 
-      .o_byte_active        (),
-      .o_pkt_received_pulse (),
-      .o_pkt_sent_pulse     ()
+      .o_byte_active       (),
+      .o_pkt_received_pulse(),
+      .o_pkt_sent_pulse    ()
   );
 
   eth_tx eth1_tx_inst (
       .clk(eth1_clk),
       .rst(rst),
       .eth_txen(eth1_txen),
-      .eth_txd (eth1_txd),
+      .eth_txd(eth1_txd),
 
-      .i_tx_work_pop_cpu_id (0),
-      .i_tx_work_pop_data   (rev_work_pop_data),
-      .i_tx_work_pop_valid  (rev_work_pop_valid),
-      .o_tx_work_pop_ready  (rev_work_pop_ready),
+      .i_tx_work_pop_cpu_id(0),
+      .i_tx_work_pop_data  (rev_work_pop_data),
+      .i_tx_work_pop_valid (rev_work_pop_valid),
+      .o_tx_work_pop_ready (rev_work_pop_ready),
 
       .o_free_buf_push_cpu_id(),
       .o_free_buf_push_data  (rev_free_buf_push_data),
@@ -616,14 +616,14 @@ module network_bpf
       .i_free_buf_push_ready (rev_free_buf_push_ready),
 
       .o_rd_en  (rev_tx_rd_en),
-      .o_cpu_id (), 
+      .o_cpu_id (),
       .o_buf_id (rev_tx_buf_id),
       .o_rd_addr(rev_tx_buf_addr),
       .i_rd_data(rev_tx_rd_data),
 
-      .o_byte_active        (),
-      .o_pkt_received_pulse (),
-      .o_pkt_sent_pulse     ()
+      .o_byte_active       (),
+      .o_pkt_received_pulse(),
+      .o_pkt_sent_pulse    ()
   );
 
 endmodule
