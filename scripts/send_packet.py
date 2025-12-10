@@ -20,10 +20,22 @@ parser = argparse.ArgumentParser(description='Send packets with different protoc
 parser.add_argument('count', type=int, nargs='?', default=10, help='Number of packets to send (default: 10)')
 parser.add_argument('-p', '--protocol', type=str, default='udp', choices=['udp', 'tcp', 'icmp'],
                     help='Protocol to use: udp, tcp, or icmp (default: udp)')
+parser.add_argument('--filter-match', action='store_true',
+                    help='Generate packets that match the BPF filter (IPv4 UDP port 443, len >= 500)')
 args = parser.parse_args()
 
 count = args.count
 protocol = args.protocol.lower()
+
+# Override settings if filter-match mode is enabled
+if args.filter_match:
+    print("Filter-match mode: Generating packets that satisfy the BPF filter")
+    print("  - IPv4 (EtherType 0x800)")
+    print("  - UDP (protocol 17)")
+    print("  - Destination port 443")
+    print("  - Packet length >= 500 bytes")
+    protocol = 'udp'
+    dst_port = 443
 
 # Send packets with incrementing source IP addresses
 for i in range(count):
@@ -34,7 +46,14 @@ for i in range(count):
     if protocol == 'udp':
         ip = IP(src=current_src_ip, dst=dst_ip, proto=17)  # proto=17 for UDP
         transport = UDP(sport=src_port, dport=dst_port)
-        payload = f"packet {i}".encode()
+
+        # If filter-match mode, ensure packet is at least 500 bytes
+        if args.filter_match:
+            min_payload_size = 500 - 42
+            payload = f"packet {i}".encode() + b'X' * (min_payload_size - len(f"packet {i}".encode()))
+        else:
+            payload = f"packet {i}".encode()
+
         pkt = eth / ip / transport / payload
     elif protocol == 'tcp':
         ip = IP(src=current_src_ip, dst=dst_ip, proto=6)  # proto=6 for TCP
@@ -47,6 +66,6 @@ for i in range(count):
         payload = f"packet {i}".encode()
         pkt = eth / ip / icmp / payload
 
-    print(f"Sending {protocol.upper()} packet {i}: src_ip={current_src_ip}, Frame size: {len(bytes(pkt))}")
+    print(f"Sending {protocol.upper()} packet {i}: src_ip={current_src_ip}, dst_port={dst_port}, Frame size: {len(bytes(pkt))}")
 
     sendp(pkt, iface=iface, count=1, inter=0.1, verbose=False)
