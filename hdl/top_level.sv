@@ -61,66 +61,6 @@ module top_level (
       .locked(pixel_locked)
   );
 
-
-
-  // ------------------------------------------------------------------------
-  // Packet Counting and Packet Simulations
-  // ------------------------------------------------------------------------
-  // --- Packet Counter --
-
-  // logic display_fifo_pop_valid;
-  // logic display_fifo_pop_ready;
-  // logic network_statistics_valid;
-
-  // localparam PACKET_COUNT = 26;
-  // localparam PUSH_CYCLES = 10_000_000;
-
-  // // --- Statistics Signals ---
-  // logic [31:0] cdc_dropped_packets;
-  // logic [31:0] cdc_total_packets;
-  // logic [31:0] cycle_count;
-  // logic is_counting;
-
-  // evt_counter #(
-  //     .MAX_COUNT(PACKET_COUNT)
-  // ) cycle_counter (
-  //     .clk(clk_pixel),
-  //     .rst(sys_rst),
-  //     .evt(1),
-  //     .added_num(1),
-  //     .count(cdc_total_packets)
-  // );
-  // evt_counter #(
-  //     .MAX_COUNT(PUSH_CYCLES)
-  // ) push_counter (
-  //     .clk(clk_pixel),
-  //     .rst(sys_rst),
-  //     .evt(is_counting),
-  //     .added_num(1),
-  //     .count(cycle_count)
-  // );
-
-  // assign cdc_dropped_packets = cdc_total_packets >> 1;
-
-  // always_ff @(posedge clk_pixel) begin
-  //   if (display_fifo_pop_valid) begin
-  //     if (display_fifo_pop_ready) begin
-  //       display_fifo_pop_valid <= 0;
-  //     end else begin
-  //       is_counting <= 0;
-  //     end
-  //   end else begin
-  //     if (cycle_count == 9_999_999) begin
-  //       display_fifo_pop_valid <= 1;
-  //     end
-  //     is_counting <= 1;
-  //   end
-  // end
-
-  // logic [31:0] total_bytes;
-  // logic [31:0] received_packets;
-  // logic [31:0] sent_packets;
-
   // ------------------------------------------------------------------------
   // Counting Real Packets from Ethernet
   // ------------------------------------------------------------------------
