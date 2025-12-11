@@ -125,7 +125,7 @@ module top_level (
   // Counting Real Packets from Ethernet
   // ------------------------------------------------------------------------
 
-  localparam SAMPLING_CYCLES = 100_000_000;
+  localparam SAMPLING_CYCLES = 25_000_000;
   logic display_fifo_push_ready;
   logic network_statistics_valid;
   logic [31:0] cycle_count;

@@ -169,7 +169,7 @@ module display_controller #(
         blue  = 0;
         green = 0;
       end else begin
-        lower_packet_count = (NUM_PACKET_RANGES - packet_count_bucket - 1) << 2;
+        lower_packet_count = (NUM_PACKET_RANGES - packet_count_bucket - 1) << 4;
         if (lower_packet_count < current_dropped_packet_count) begin
           // Color red for dropped packets
           red   = 8'HFF;
