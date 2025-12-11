@@ -1,154 +1,143 @@
 #!/usr/bin/env python3
 """
-Optimized stress test sender for macOS using Scapy with L2Socket.
+Robust FPGA Stress Sender (Multi-Protocol Support)
+--------------------------------------------------
+1. Generates packets (UDP, TCP, or ICMP) using Scapy.
+2. Saves them to a temp PCAP file.
+3. Uses 'tcpreplay' (with --intf1) to transmit them at a precise rate.
 
 Usage:
-    sudo python3 stress_send.py [count] [payload_size] [target_mbps]
-
-    count: Number of packets to send (default: 50000)
-    payload_size: Size of payload in bytes (default: 1472)
-    target_mbps: Target data rate in Mbps (default: 50)
+    sudo ./robust_sender.py [count] [size] [mbps] [protocol]
 """
+
 import sys
-import time
-from scapy.all import Ether, IP, UDP, conf
+import os
+import subprocess
+import tempfile
+from scapy.all import Ether, IP, UDP, TCP, ICMP, wrpcap
 
-iface = "en10"
+# --- Configuration ---
+IFACE = "en7"
+DST_MAC = "5a:65:7b:63:ba:d3"
+SRC_MAC = "5a:65:7b:63:ba:d3" 
+SRC_IP = "192.168.1.100"
+DST_IP_BASE = "10"
+SRC_PORT = 12345
+DST_PORT = 53
 
-# --- Layer 2 (Ethernet) ---
-dst_mac = "5a:65:7b:63:ba:d3"
-src_mac = "5a:65:7b:63:ba:d3"
+# Defaults
+DEFAULT_COUNT = 50000
+DEFAULT_PAYLOAD = 1472
+DEFAULT_MBPS = 100
+DEFAULT_PROTO = "udp"
 
-# --- Layer 3 (IP) ---
-src_ip = "192.168.1.100"
-dst_ip_base = "10"
+def check_tcpreplay():
+    """Checks if tcpreplay is installed."""
+    try:
+        subprocess.run(["tcpreplay", "-V"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        print("Error: 'tcpreplay' is not found!")
+        print("Please install it (macOS: 'brew install tcpreplay', Linux: 'apt install tcpreplay')")
+        sys.exit(1)
 
-# --- Layer 4 (UDP) ---
-src_port = 12345
-dst_port = 53
-
-# Parse command line arguments
-count = 50000
-payload_size = 1500 
-target_mbps = 100
-
-if len(sys.argv) > 1:
-    count = int(sys.argv[1])
-if len(sys.argv) > 2:
-    payload_size = int(sys.argv[2])
-if len(sys.argv) > 3:
-    target_mbps = int(sys.argv[3])
-
-# Validate payload size
-MIN_PAYLOAD = 8
-MAX_PAYLOAD = 1472
-
-if payload_size < MIN_PAYLOAD:
-    print(f"Error: payload_size must be at least {MIN_PAYLOAD} bytes")
-    sys.exit(1)
-if payload_size > MAX_PAYLOAD:
-    print(f"Warning: Using max payload size {MAX_PAYLOAD} bytes")
-    payload_size = MAX_PAYLOAD
-
-print(f"Optimized macOS stress test: {count} packets")
-print(f"Interface: {iface}")
-print(f"Payload size: {payload_size} bytes")
-print(f"Destination IP encoding: 10.A.B.C (24-bit)")
-print("-" * 60)
-
-print("Pre-building packets...")
-build_start = time.time()
-
-packets = []
-for i in range(count):
-    # Encode packet number in destination IP
-    octet2 = (i >> 16) & 0xFF
-    octet3 = (i >> 8) & 0xFF
-    octet4 = i & 0xFF
-    dst_ip = f"{dst_ip_base}.{octet2}.{octet3}.{octet4}"
-
-    eth = Ether(dst=dst_mac, src=src_mac, type=0x0800)
-    ip = IP(src=src_ip, dst=dst_ip, proto=17)
-    udp = UDP(sport=src_port, dport=dst_port)
-
-    counter_bytes = i.to_bytes(8, byteorder='big')
+def generate_pcap(count, payload_size, pcap_path, protocol="udp"):
+    """Generates packets and writes them to a pcap file."""
+    print(f"[1/3] Generating {count} {protocol.upper()} packets...")
+    
+    packets = []
+    # Pre-calculate padding
     padding = bytes([0xAA] * (payload_size - 8))
-    payload = counter_bytes + padding
-
-    pkt = eth / ip / udp / payload
-    packets.append(bytes(pkt))
-
-build_time = time.time() - build_start
-
-frame_size = len(packets[0])
-print(f"Frame size: {frame_size} bytes")
-print(f"Build time: {build_time:.2f} seconds ({count/build_time:.0f} pkts/s)")
-print(f"Total data: {(count * frame_size) / 1_000_000:.2f} MB")
-print(f"Estimated bandwidth: {(count * frame_size * 8) / 1_000_000:.2f} Mb")
-print()
-
-try:
-    print("Opening L2 socket...")
-    socket = conf.L2socket(iface=iface)
-except Exception as e:
-    print(f"Error opening socket: {e}")
-    print("Make sure to run with sudo!")
-    sys.exit(1)
-
-print(f"Starting optimized transmission...")
-print(f"Note: Progress updates every 10k packets\n")
-
-# Calculate delay to maintain target data rate based on frame size
-target_bits_per_sec = target_mbps * 1_000_000
-bits_per_packet = frame_size * 8
-packets_per_sec = target_bits_per_sec / bits_per_packet
-delay_per_packet = 1.0 / packets_per_sec
-
-print(f"Target rate: {target_mbps} Mbps")
-print(f"Delay per packet: {delay_per_packet*1000:.3f} ms ({packets_per_sec:.0f} pkt/s)\n")
-
-start_time = time.time()
-sent = 0
-
-try:
+    
     for i in range(count):
-        packet_start = time.time()
-        socket.send(packets[i])
-        send_time = time.time() - packet_start
-        sent += 1
+        # Encode packet number in destination IP (10.X.X.X)
+        octet2 = (i >> 16) & 0xFF
+        octet3 = (i >> 8) & 0xFF
+        octet4 = i & 0xFF
+        dst_ip = f"{DST_IP_BASE}.{octet2}.{octet3}.{octet4}"
 
-        # Adjust delay to account for send time
-        adjusted_delay = delay_per_packet - send_time
-        if adjusted_delay > 0:
-            time.sleep(adjusted_delay)
+        # Counter in payload (First 8 bytes)
+        counter_bytes = i.to_bytes(8, byteorder='big')
+        full_payload = counter_bytes + padding
+        
+        # Base L2/L3 Headers
+        eth_ip = Ether(dst=DST_MAC, src=SRC_MAC) / IP(src=SRC_IP, dst=dst_ip)
 
-        # Print progress every 10000 packets
-        if sent % 10000 == 0:
-            elapsed = time.time() - start_time
-            rate = sent / elapsed if elapsed > 0 else 0
-            data_rate = (sent * frame_size * 8) / elapsed / 1_000_000 if elapsed > 0 else 0
-            print(f"Sent {sent}/{count} packets ({rate:.0f} pkt/s, {data_rate:.1f} Mbps)")
+        # L4 Header Selection
+        if protocol == "udp":
+            pkt = eth_ip / UDP(sport=SRC_PORT, dport=DST_PORT) / full_payload
+        
+        elif protocol == "tcp":
+            # using PA (Push/Ack) flags to simulate data transfer
+            pkt = eth_ip / TCP(sport=SRC_PORT, dport=DST_PORT, flags="PA") / full_payload
+            
+        elif protocol == "icmp":
+            # Type 8 is Echo Request (Ping)
+            pkt = eth_ip / ICMP(type=8, code=0) / full_payload
+            
+        else:
+            print(f"Error: Unknown protocol {protocol}")
+            sys.exit(1)
+        
+        packets.append(pkt)
 
-except KeyboardInterrupt:
-    print("\n\nInterrupted by user!")
+        if i % 10000 == 0 and i > 0:
+            print(f"      ... generated {i} packets")
 
-end_time = time.time()
-elapsed = end_time - start_time
+    print(f"[2/3] Writing to temporary file: {pcap_path} ...")
+    wrpcap(pcap_path, packets)
+    print("      Write complete.")
 
-socket.close()
+def run_tcpreplay(iface, mbps, pcap_path):
+    """Executes tcpreplay to send the traffic."""
+    print(f"[3/3] Starting Transmission via tcpreplay...")
+    print(f"      Target: {mbps} Mbps on {iface}")
+    print("-" * 60)
+    
+    cmd = [
+        "sudo", "tcpreplay",
+        "--intf1=" + iface,
+        "--mbps=" + str(mbps),
+        pcap_path
+    ]
+    
+    try:
+        subprocess.run(cmd, check=True)
+    except KeyboardInterrupt:
+        print("\nStopping transmission...")
+    except subprocess.CalledProcessError as e:
+        print(f"\nError running tcpreplay: {e}")
 
-print()
-print("=" * 60)
-print("TRANSMISSION COMPLETE")
-print("=" * 60)
-print(f"Packets sent: {sent}")
-print(f"Time elapsed: {elapsed:.4f} seconds")
-if elapsed > 0:
-    print(f"Average rate: {sent/elapsed:.0f} packets/sec")
-    print(f"Data rate: {(sent * frame_size * 8) / elapsed / 1_000_000:.2f} Mbps")
-    print(f"Total data: {(sent * frame_size) / 1_000_000:.2f} MB")
+def main():
+    # Argument Parsing
+    count = int(sys.argv[1]) if len(sys.argv) > 1 else DEFAULT_COUNT
+    payload_size = int(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_PAYLOAD
+    target_mbps = int(sys.argv[3]) if len(sys.argv) > 3 else DEFAULT_MBPS
+    protocol = sys.argv[4].lower() if len(sys.argv) > 4 else DEFAULT_PROTO
 
-    theoretical_max = 1000_000_000 / 8 / frame_size  # 1 Gbps
-    efficiency = (sent/elapsed) / theoretical_max * 100 if theoretical_max > 0 else 0
-    print(f"\nLine efficiency: {efficiency:.1f}% of 1 Gbps")
-print("=" * 60)
+    # Validation
+    valid_protos = ["udp", "tcp", "icmp"]
+    if protocol not in valid_protos:
+        print(f"Error: Protocol must be one of {valid_protos}")
+        sys.exit(1)
+        
+    if payload_size > 1472:
+        payload_size = 1472
+        print("Warning: Payload capped at 1472 bytes (MTU limit)")
+
+    check_tcpreplay()
+
+    # Create a temporary file for the pcap
+    fd, temp_path = tempfile.mkstemp(suffix=".pcap")
+    os.close(fd)
+
+    try:
+        generate_pcap(count, payload_size, temp_path, protocol)
+        run_tcpreplay(IFACE, target_mbps, temp_path)
+    finally:
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+            print("-" * 60)
+            print("Temporary pcap file cleaned up.")
+
+if __name__ == "__main__":
+    main()

@@ -1,7 +1,7 @@
 import argparse
 from scapy.all import Ether, IP, UDP, TCP, ICMP, sendp
 
-iface = "en10"
+iface = "en7"
 
 # --- Layer 2 (Ethernet) ---
 dst_mac = "5a:65:7b:63:ba:d3"
